@@ -48,7 +48,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-app.use(express.static('public'));
+app.use(express.static('public', { extensions: ['html'] }));
 
 // Admin login
 app.post('/api/admin/login', (req, res) => {
