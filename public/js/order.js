@@ -34,8 +34,9 @@ function renderMenu(category) {
   const filtered = category === 'all' ? dynamicMenu : dynamicMenu.filter(i => i.category === category);
 
   grid.innerHTML = filtered.map(item => `
-    <div class="order-item-card" data-category="${item.category}">
-      <div class="order-item-image">
+    <div class="order-item-card ${item.isSoldOut ? 'item-sold-out' : ''}" data-category="${item.category}">
+      <div class="order-item-image" style="position:relative;">
+        ${item.isSoldOut ? '<div class="sold-out-overlay">SOLD OUT</div>' : ''}
         <img src="${item.image}" alt="${item.name}" loading="lazy">
       </div>
       <div class="order-item-info">
@@ -43,7 +44,7 @@ function renderMenu(category) {
         <p class="item-desc">${item.desc}</p>
         <div class="order-item-bottom">
           <span class="item-price">₹${item.price}</span>
-          <button class="add-to-cart-btn" onclick="addToCart(${item.id})" title="Add to cart">
+          <button class="add-to-cart-btn" onclick="addToCart(${item.id})" title="Add to cart" ${item.isSoldOut ? 'disabled' : ''}>
             <i class="fas fa-plus"></i>
           </button>
         </div>

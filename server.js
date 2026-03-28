@@ -39,7 +39,8 @@ const menuItemSchema = new mongoose.Schema({
   category: String,
   price: Number,
   desc: String,
-  image: String
+  image: String,
+  isSoldOut: { type: Boolean, default: false }
 });
 const MenuItem = mongoose.model('MenuItem', menuItemSchema);
 
@@ -160,6 +161,21 @@ app.delete('/api/menu/:id', requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
+// TOGGLE sold out status (admin only)
+app.patch('/api/menu/:id/soldout', requireAdmin, async (req, res) => {
+  try {
+    const item = await MenuItem.findOne({ id: Number(req.params.id) });
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    
+    item.isSoldOut = !item.isSoldOut;
+    await item.save();
+    
+    res.json({ success: true, isSoldOut: item.isSoldOut });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle status' });
   }
 });
 

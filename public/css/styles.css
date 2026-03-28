@@ -838,6 +838,27 @@ section {
   transform: scale(1.08);
 }
 
+/* Sold Out Styles */
+.item-sold-out {
+  opacity: 0.6;
+}
+.item-sold-out img {
+  filter: grayscale(1);
+}
+.sold-out-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: var(--neon-pink);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  z-index: 2;
+  box-shadow: 0 0 10px rgba(255, 45, 117, 0.5);
+}
+
 .order-item-info {
   padding: 16px;
 }
