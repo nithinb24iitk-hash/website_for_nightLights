@@ -1518,7 +1518,16 @@ section {
     align-items: center;
     justify-content: space-between;
     cursor: pointer;
-    padding: 4px 0 12px;
+    padding: 12px 0;
+  }
+
+  .cart-header h3 {
+    display: none;
+  }
+
+  .cart-header {
+    justify-content: flex-end;
+    padding-top: 0;
   }
 
   .order-menu-section {
