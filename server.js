@@ -33,7 +33,10 @@ const orderSchema = new mongoose.Schema({
 const Order = mongoose.model('Order', orderSchema);
 
 // Security Middleware
-app.use(helmet()); 
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+})); 
 app.use(cors());
 app.use(express.json({ limit: '10kb' })); // Limit payload size to prevent DOS
 
