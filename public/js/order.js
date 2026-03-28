@@ -2,41 +2,11 @@
 // FRY-DAY NIGHT LIGHTS — Order Page JS
 // ==========================================
 
-const MENU_ITEMS = [
-  // Burgers
-  { id: 1, name: 'Classic Smash Burger', category: 'burgers', price: 149, desc: 'Juicy smashed patty with melted cheese, lettuce, tomato & our secret sauce', image: 'images/burger.png' },
-  { id: 2, name: 'Double Trouble Burger', category: 'burgers', price: 199, desc: 'Double patty loaded with cheese, caramelized onions & crispy bacon', image: 'images/burger.png' },
-  { id: 3, name: 'Spicy Chicken Burger', category: 'burgers', price: 179, desc: 'Crispy fried chicken with spicy mayo, pickles & fresh vegetables', image: 'images/burger.png' },
-  { id: 4, name: 'Veggie Crunch Burger', category: 'burgers', price: 129, desc: 'Crispy vegetable patty with fresh lettuce, tomato & mint chutney', image: 'images/burger.png' },
-
-  // Fries
-  { id: 5, name: 'Classic Salted Fries', category: 'fries', price: 89, desc: 'Golden crispy fries with the perfect amount of seasoning', image: 'images/fries.png' },
-  { id: 6, name: 'Loaded Cheese Fries', category: 'fries', price: 149, desc: 'Fries smothered in nacho cheese sauce with jalapeños & herbs', image: 'images/fries.png' },
-  { id: 7, name: 'Peri Peri Fries', category: 'fries', price: 109, desc: 'Spicy peri peri seasoned fries that pack a punch', image: 'images/fries.png' },
-  { id: 8, name: 'Masala Magic Fries', category: 'fries', price: 119, desc: 'Indian spiced fries with chaat masala, onions & coriander', image: 'images/fries.png' },
-
-  // Pizza
-  { id: 9, name: 'Margherita Pizza', category: 'pizza', price: 199, desc: 'Classic tomato sauce, fresh mozzarella & basil leaves', image: 'images/pizza.png' },
-  { id: 10, name: 'Pepperoni Feast', category: 'pizza', price: 299, desc: 'Loaded with pepperoni, mozzarella & our signature tomato sauce', image: 'images/pizza.png' },
-  { id: 11, name: 'Veggie Supreme', category: 'pizza', price: 249, desc: 'Bell peppers, onions, mushrooms, olives & corn with mozzarella', image: 'images/pizza.png' },
-  { id: 12, name: 'BBQ Chicken Pizza', category: 'pizza', price: 319, desc: 'Tangy BBQ sauce, grilled chicken, onions & mozzarella cheese', image: 'images/pizza.png' },
-
-  // Milkshakes
-  { id: 13, name: 'Mango Madness', category: 'milkshakes', price: 129, desc: 'Fresh Alphonso mango blended with creamy vanilla ice cream', image: 'images/milkshakes.png' },
-  { id: 14, name: 'Oreo Blast', category: 'milkshakes', price: 149, desc: 'Crushed Oreos with chocolate ice cream & whipped cream', image: 'images/milkshakes.png' },
-  { id: 15, name: 'Strawberry Dream', category: 'milkshakes', price: 139, desc: 'Sweet strawberries blended with vanilla ice cream & milk', image: 'images/milkshakes.png' },
-  { id: 16, name: 'Chocolate Overload', category: 'milkshakes', price: 159, desc: 'Rich chocolate with brownie chunks & chocolate sauce drizzle', image: 'images/milkshakes.png' },
-
-  // Desserts
-  { id: 17, name: 'Classic Vanilla Scoop', category: 'desserts', price: 79, desc: 'Creamy vanilla bean ice cream in a waffle cone', image: 'images/desserts.png' },
-  { id: 18, name: 'Chocolate Fudge Sundae', category: 'desserts', price: 149, desc: 'Chocolate ice cream with hot fudge, nuts & whipped cream', image: 'images/desserts.png' },
-  { id: 19, name: 'Brownie with Ice Cream', category: 'desserts', price: 169, desc: 'Warm chocolate brownie topped with vanilla ice cream & sauce', image: 'images/desserts.png' },
-  { id: 20, name: 'Mango Ice Cream Cup', category: 'desserts', price: 99, desc: 'Two scoops of fresh mango ice cream with mango chunks', image: 'images/desserts.png' },
-];
+let dynamicMenu = [];
 
 let cart = [];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Hamburger
   const hamburger = document.getElementById('hamburger');
   const navLinks = document.getElementById('navLinks');
@@ -44,6 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     hamburger.classList.toggle('active');
     navLinks.classList.toggle('open');
   });
+
+  try {
+    const res = await fetch('/api/menu');
+    dynamicMenu = await res.json();
+  } catch (err) {
+    console.error('Failed to load menu data');
+  }
 
   renderMenu('all');
   setupFilters();
@@ -54,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Render menu items
 function renderMenu(category) {
   const grid = document.getElementById('orderMenuGrid');
-  const filtered = category === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(i => i.category === category);
+  const filtered = category === 'all' ? dynamicMenu : dynamicMenu.filter(i => i.category === category);
 
   grid.innerHTML = filtered.map(item => `
     <div class="order-item-card" data-category="${item.category}">
@@ -100,7 +77,7 @@ function setupCartToggle() {
 
 // Add to cart
 function addToCart(id) {
-  const item = MENU_ITEMS.find(i => i.id === id);
+  const item = dynamicMenu.find(i => i.id === id);
   const existing = cart.find(c => c.id === id);
   if (existing) {
     existing.qty += 1;

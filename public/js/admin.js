@@ -2,29 +2,7 @@
 // FRY-DAY NIGHT LIGHTS — Admin Page JS
 // ==========================================
 
-const MENU_ITEMS = [
-  { id: 1, name: 'Classic Smash Burger', category: 'burgers', price: 149 },
-  { id: 2, name: 'Double Trouble Burger', category: 'burgers', price: 199 },
-  { id: 3, name: 'Spicy Chicken Burger', category: 'burgers', price: 179 },
-  { id: 4, name: 'Veggie Crunch Burger', category: 'burgers', price: 129 },
-  { id: 5, name: 'Classic Salted Fries', category: 'fries', price: 89 },
-  { id: 6, name: 'Loaded Cheese Fries', category: 'fries', price: 149 },
-  { id: 7, name: 'Peri Peri Fries', category: 'fries', price: 109 },
-  { id: 8, name: 'Masala Magic Fries', category: 'fries', price: 119 },
-  { id: 9, name: 'Margherita Pizza', category: 'pizza', price: 199 },
-  { id: 10, name: 'Pepperoni Feast', category: 'pizza', price: 299 },
-  { id: 11, name: 'Veggie Supreme', category: 'pizza', price: 249 },
-  { id: 12, name: 'BBQ Chicken Pizza', category: 'pizza', price: 319 },
-  { id: 13, name: 'Mango Madness', category: 'milkshakes', price: 129 },
-  { id: 14, name: 'Oreo Blast', category: 'milkshakes', price: 149 },
-  { id: 15, name: 'Strawberry Dream', category: 'milkshakes', price: 139 },
-  { id: 16, name: 'Chocolate Overload', category: 'milkshakes', price: 159 },
-  { id: 17, name: 'Classic Vanilla Scoop', category: 'desserts', price: 79 },
-  { id: 18, name: 'Chocolate Fudge Sundae', category: 'desserts', price: 149 },
-  { id: 19, name: 'Brownie with Ice Cream', category: 'desserts', price: 169 },
-  { id: 20, name: 'Mango Ice Cream Cup', category: 'desserts', price: 99 },
-];
-
+let dynamicMenu = [];
 let allOrders = [];
 let currentFilter = 'all';
 let adminCart = {};
@@ -61,6 +39,16 @@ document.addEventListener('DOMContentLoaded', () => {
     showDashboard();
   }
 });
+
+// Fetch menu from DB
+async function fetchMenu() {
+  try {
+    const res = await fetch('/api/menu');
+    dynamicMenu = await res.json();
+  } catch (err) {
+    console.error('Error fetching menu');
+  }
+}
 
 // Login
 function setupLogin() {
@@ -102,6 +90,7 @@ function showDashboard() {
   document.getElementById('adminDashboard').style.display = 'block';
 
   fetchOrders();
+  fetchMenu();
   setupStatusFilters();
   setupAdminOrderModal();
 
@@ -254,11 +243,11 @@ function setupAdminOrderModal() {
   const totalDisplay = document.getElementById('adminOrderTotal');
 
   // Build the menu item picker grouped by category
-  const categories = [...new Set(MENU_ITEMS.map(i => i.category))];
+  const categories = [...new Set(dynamicMenu.map(i => i.category))];
   menuContainer.innerHTML = categories.map(cat => `
     <div style="margin-bottom:12px;">
       <div style="font-family:'Outfit',sans-serif;font-weight:600;font-size:0.85rem;color:var(--neon-pink);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${cat}</div>
-      ${MENU_ITEMS.filter(i => i.category === cat).map(item => `
+      ${dynamicMenu.filter(i => i.category === cat).map(item => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
           <div style="flex:1;">
             <span style="font-size:0.9rem;">${item.name}</span>

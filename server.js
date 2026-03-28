@@ -17,7 +17,7 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log('📦 Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Database Model
+// Order Model
 const orderSchema = new mongoose.Schema({
   id: String,
   customerName: String,
@@ -31,6 +31,49 @@ const orderSchema = new mongoose.Schema({
   createdAt: String
 });
 const Order = mongoose.model('Order', orderSchema);
+
+// Menu Item Model
+const menuItemSchema = new mongoose.Schema({
+  id: Number,
+  name: String,
+  category: String,
+  price: Number,
+  desc: String,
+  image: String
+});
+const MenuItem = mongoose.model('MenuItem', menuItemSchema);
+
+// Seed Default Menu if Empty
+async function seedMenu() {
+  const count = await MenuItem.countDocuments();
+  if (count === 0) {
+    console.log('🌱 Seeding initial menu into MongoDB...');
+    const defaultMenu = [
+      { id: 1, name: 'Classic Smash Burger', category: 'burgers', price: 149, desc: 'Juicy smashed patty with melted cheese, lettuce, tomato & our secret sauce', image: 'images/burger.png' },
+      { id: 2, name: 'Double Trouble Burger', category: 'burgers', price: 199, desc: 'Double patty loaded with cheese, caramelized onions & crispy bacon', image: 'images/burger.png' },
+      { id: 3, name: 'Spicy Chicken Burger', category: 'burgers', price: 179, desc: 'Crispy fried chicken with spicy mayo, pickles & fresh vegetables', image: 'images/burger.png' },
+      { id: 4, name: 'Veggie Crunch Burger', category: 'burgers', price: 129, desc: 'Crispy vegetable patty with fresh lettuce, tomato & mint chutney', image: 'images/burger.png' },
+      { id: 5, name: 'Classic Salted Fries', category: 'fries', price: 89, desc: 'Golden crispy fries with the perfect amount of seasoning', image: 'images/fries.png' },
+      { id: 6, name: 'Loaded Cheese Fries', category: 'fries', price: 149, desc: 'Fries smothered in nacho cheese sauce with jalapeños & herbs', image: 'images/fries.png' },
+      { id: 7, name: 'Peri Peri Fries', category: 'fries', price: 109, desc: 'Spicy peri peri seasoned fries that pack a punch', image: 'images/fries.png' },
+      { id: 8, name: 'Masala Magic Fries', category: 'fries', price: 119, desc: 'Indian spiced fries with chaat masala, onions & coriander', image: 'images/fries.png' },
+      { id: 9, name: 'Margherita Pizza', category: 'pizza', price: 199, desc: 'Classic tomato sauce, fresh mozzarella & basil leaves', image: 'images/pizza.png' },
+      { id: 10, name: 'Pepperoni Feast', category: 'pizza', price: 299, desc: 'Loaded with pepperoni, mozzarella & our signature tomato sauce', image: 'images/pizza.png' },
+      { id: 11, name: 'Veggie Supreme', category: 'pizza', price: 249, desc: 'Bell peppers, onions, mushrooms, olives & corn with mozzarella', image: 'images/pizza.png' },
+      { id: 12, name: 'BBQ Chicken Pizza', category: 'pizza', price: 319, desc: 'Tangy BBQ sauce, grilled chicken, onions & mozzarella cheese', image: 'images/pizza.png' },
+      { id: 13, name: 'Mango Madness', category: 'milkshakes', price: 129, desc: 'Fresh Alphonso mango blended with creamy vanilla ice cream', image: 'images/milkshakes.png' },
+      { id: 14, name: 'Oreo Blast', category: 'milkshakes', price: 149, desc: 'Crushed Oreos with chocolate ice cream & whipped cream', image: 'images/milkshakes.png' },
+      { id: 15, name: 'Strawberry Dream', category: 'milkshakes', price: 139, desc: 'Sweet strawberries blended with vanilla ice cream & milk', image: 'images/milkshakes.png' },
+      { id: 16, name: 'Chocolate Overload', category: 'milkshakes', price: 159, desc: 'Rich chocolate with brownie chunks & chocolate sauce drizzle', image: 'images/milkshakes.png' },
+      { id: 17, name: 'Classic Vanilla Scoop', category: 'desserts', price: 79, desc: 'Creamy vanilla bean ice cream in a waffle cone', image: 'images/desserts.png' },
+      { id: 18, name: 'Chocolate Fudge Sundae', category: 'desserts', price: 149, desc: 'Chocolate ice cream with hot fudge, nuts & whipped cream', image: 'images/desserts.png' },
+      { id: 19, name: 'Brownie with Ice Cream', category: 'desserts', price: 169, desc: 'Warm chocolate brownie topped with vanilla ice cream & sauce', image: 'images/desserts.png' },
+      { id: 20, name: 'Mango Ice Cream Cup', category: 'desserts', price: 99, desc: 'Two scoops of fresh mango ice cream with mango chunks', image: 'images/desserts.png' }
+    ];
+    await MenuItem.insertMany(defaultMenu);
+  }
+}
+mongoose.connection.once('open', seedMenu);
 
 // Security Middleware
 app.use(helmet({
@@ -68,6 +111,57 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// GET all menu items (public)
+app.get('/api/menu', async (req, res) => {
+  try {
+    const items = await MenuItem.find().sort({ id: 1 });
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error fetching menu' });
+  }
+});
+
+// POST new menu item (admin only)
+app.post('/api/menu', requireAdmin, async (req, res) => {
+  try {
+    const highestIdItem = await MenuItem.findOne().sort({ id: -1 });
+    const nextId = highestIdItem ? highestIdItem.id + 1 : 1;
+
+    // determine generic image by category
+    const category = req.body.category || 'burgers';
+    let imageSrc = `images/${category}.png`;
+    // fallback if unmapped category
+    if (!['burgers', 'fries', 'pizza', 'milkshakes', 'desserts'].includes(category)) {
+      imageSrc = 'images/burger.png';
+    }
+
+    const newItem = new MenuItem({
+      id: nextId,
+      name: escapeHtml(req.body.name),
+      category: category,
+      price: Number(req.body.price),
+      desc: escapeHtml(req.body.desc || ''),
+      image: imageSrc
+    });
+
+    await newItem.save();
+    res.status(201).json(newItem);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add menu item' });
+  }
+});
+
+// DELETE menu item (admin only)
+app.delete('/api/menu/:id', requireAdmin, async (req, res) => {
+  try {
+    const result = await MenuItem.findOneAndDelete({ id: Number(req.params.id) });
+    if (!result) return res.status(404).json({ error: 'Item not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
 
 // GET all orders (admin only)
 app.get('/api/orders', requireAdmin, async (req, res) => {

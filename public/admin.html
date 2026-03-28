@@ -57,13 +57,10 @@
           <h2 class="section-title" style="margin-bottom:4px;">Admin Panel</h2>
           <p style="color: var(--text-muted); font-size:0.9rem;">Manage orders and track your business</p>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-secondary" id="refreshBtn">
-            <i class="fas fa-sync-alt"></i> Refresh
-          </button>
-          <button class="btn btn-primary" id="adminOrderBtn">
-            <i class="fas fa-plus"></i> New Order
-          </button>
+        <div class="admin-actions">
+            <button class="btn btn-secondary" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button class="btn btn-primary" id="adminOrderBtn"><i class="fas fa-plus"></i> New Order</button>
+            <button class="btn btn-secondary" style="border: 1px solid var(--neon-pink); color: var(--neon-pink); background: rgba(255,45,117,0.1);" onclick="document.getElementById('menuManagerModal').classList.add('active')"><i class="fas fa-edit"></i> Manage Menu</button>
         </div>
       </div>
 
@@ -156,6 +153,53 @@
           <button type="submit" class="btn btn-primary">Create Order</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MENU MANAGER MODAL -->
+  <div class="modal-overlay" id="menuManagerModal">
+    <div class="modal" style="max-width: 600px; width: 95%;">
+      <h3><i class="fas fa-utensils"></i> Manage Menu</h3>
+      
+      <div style="margin-bottom: 2rem;">
+        <h4 style="margin-bottom: 1rem; color: var(--neon-cyan);">Add New Item</h4>
+        <form id="addMenuItemForm" style="display: grid; gap: 15px; grid-template-columns: 1fr 1fr;">
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Item Name *</label>
+            <input type="text" id="newMenuName" required>
+          </div>
+          <div class="form-group">
+            <label>Category *</label>
+            <select id="newMenuCategory" required>
+              <option value="burgers">Burgers</option>
+              <option value="fries">Fries</option>
+              <option value="pizza">Pizza</option>
+              <option value="milkshakes">Milkshakes</option>
+              <option value="desserts">Desserts</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Price (₹) *</label>
+            <input type="number" id="newMenuPrice" required min="1">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Description</label>
+            <textarea id="newMenuDesc"></textarea>
+          </div>
+          <div class="form-actions" style="grid-column: 1 / -1;">
+            <button type="submit" class="btn btn-primary">Add Item</button>
+          </div>
+        </form>
+      </div>
+
+      <h4 style="margin-bottom: 1rem; color: var(--neon-pink);">Current Menu Items</h4>
+      <div id="adminMenuList" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px;">
+        <!-- Items render here -->
+      </div>
+      
+      <div class="form-actions" style="margin-top: 1rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('menuManagerModal').classList.remove('active')">Close</button>
+      </div>
     </div>
   </div>
 
