@@ -47,6 +47,25 @@ app.use('/api/', limiter);
 
 app.use(express.static('public'));
 
+// Admin login
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    res.json({ success: true, token: ADMIN_TOKEN });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+// Auth middleware for admin routes
+function requireAdmin(req, res, next) {
+  const token = req.headers['x-admin-token'];
+  if (token !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
 // GET all orders (admin only)
 app.get('/api/orders', requireAdmin, async (req, res) => {
   try {
