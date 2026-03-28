@@ -129,12 +129,16 @@ app.post('/api/menu', requireAdmin, async (req, res) => {
     const highestIdItem = await MenuItem.findOne().sort({ id: -1 });
     const nextId = highestIdItem ? highestIdItem.id + 1 : 1;
 
-    // determine generic image by category
+    // determine image by category or custom URL
     const category = req.body.category || 'burgers';
-    let imageSrc = `images/${category}.png`;
-    // fallback if unmapped category
-    if (!['burgers', 'fries', 'pizza', 'milkshakes', 'desserts'].includes(category)) {
-      imageSrc = 'images/burger.png';
+    let imageSrc = req.body.image;
+    
+    if (!imageSrc || imageSrc.trim() === '') {
+      imageSrc = `images/${category}.png`;
+      // fallback if unmapped category
+      if (!['burgers', 'fries', 'pizza', 'milkshakes', 'desserts'].includes(category)) {
+        imageSrc = 'images/burger.png';
+      }
     }
 
     const newItem = new MenuItem({

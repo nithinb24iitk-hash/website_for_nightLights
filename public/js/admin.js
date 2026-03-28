@@ -387,7 +387,8 @@ async function addMenuItem() {
     name: document.getElementById('newMenuName').value,
     category: document.getElementById('newMenuCategory').value,
     price: document.getElementById('newMenuPrice').value,
-    desc: document.getElementById('newMenuDesc').value
+    desc: document.getElementById('newMenuDesc').value,
+    image: document.getElementById('newMenuImage').value
   };
 
   try {
