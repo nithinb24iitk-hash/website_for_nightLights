@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order — FRY-DAY NIGHT LIGHTS</title>
+  <meta name="description" content="Order your favorite burgers, fries, milkshakes, and more from FRY-DAY NIGHT LIGHTS CAFE online.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="page-transition">
+
+  <!-- NAVBAR -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-icon">🍟</span>
+        <span><span class="fry">FRY-DAY</span> <span class="day">NIGHT LIGHTS</span></span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="index.html">Home</a>
+        <a href="order.html" class="active">Order</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ORDER PAGE -->
+  <main class="order-page">
+    <div class="container">
+      <div class="section-header" style="margin-bottom:32px;">
+        <div class="section-label"><i class="fas fa-circle"></i> Order Online</div>
+        <h2 class="section-title">Our Menu</h2>
+        <p class="section-subtitle">Choose your favorites and we'll have them ready for you.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="menu-filters" id="menuFilters">
+        <button class="filter-btn active" data-category="all">All</button>
+        <button class="filter-btn" data-category="burgers">🍔 Burgers</button>
+        <button class="filter-btn" data-category="fries">🍟 Fries</button>
+        <button class="filter-btn" data-category="pizza">🍕 Pizzas</button>
+        <button class="filter-btn" data-category="milkshakes">🥤 Milkshakes</button>
+        <button class="filter-btn" data-category="desserts">🍨 Desserts</button>
+      </div>
+
+      <div class="order-layout">
+        <!-- Menu Items -->
+        <div class="order-menu-section">
+          <div class="order-menu-grid" id="orderMenuGrid"></div>
+        </div>
+
+        <!-- Cart Sidebar -->
+        <aside class="cart-sidebar" id="cartSidebar">
+          <div class="cart-toggle" id="cartToggle">
+            <h3><i class="fas fa-shopping-cart"></i> Your Cart <span class="cart-count" id="cartCountMobile">0</span></h3>
+            <i class="fas fa-chevron-up"></i>
+          </div>
+          <div class="cart-header">
+            <h3><i class="fas fa-shopping-cart"></i> Your Cart <span class="cart-count" id="cartCount">0</span></h3>
+            <button class="btn-ghost" id="clearCartBtn" style="font-size:0.8rem;padding:4px 12px;">Clear</button>
+          </div>
+          <div class="cart-items" id="cartItems">
+            <div class="cart-empty">
+              <i class="fas fa-shopping-basket"></i>
+              <p>Your cart is empty</p>
+            </div>
+          </div>
+          <div class="cart-summary" id="cartSummary" style="display:none;">
+            <div class="cart-total">
+              <span>Total</span>
+              <span class="total-price" id="cartTotal">₹0</span>
+            </div>
+            <button class="checkout-btn" id="checkoutBtn">
+              <i class="fas fa-check-circle"></i> Place Order
+            </button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <!-- CHECKOUT MODAL -->
+  <div class="modal-overlay" id="checkoutModal">
+    <div class="modal">
+      <h3><i class="fas fa-receipt"></i> Confirm Your Order</h3>
+      <form id="orderForm">
+        <div class="form-group">
+          <label for="customerName">Your Name *</label>
+          <input type="text" id="customerName" required placeholder="Enter your name">
+        </div>
+        <div class="form-group">
+          <label for="customerPhone">Phone Number *</label>
+          <input type="tel" id="customerPhone" required placeholder="Enter your phone number">
+        </div>
+        <div class="form-group">
+          <label for="orderType">Order Type</label>
+          <select id="orderType">
+            <option value="dine-in">Dine In</option>
+            <option value="takeaway">Takeaway</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="orderNotes">Special Notes</label>
+          <textarea id="orderNotes" placeholder="Any special requests..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="cancelCheckout">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/order.js"></script>
+</body>
+</html>

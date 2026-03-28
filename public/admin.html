@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — FRY-DAY NIGHT LIGHTS</title>
+  <meta name="description" content="Admin dashboard for FRY-DAY NIGHT LIGHTS CAFE. Manage orders and track sales.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="page-transition">
+
+  <!-- NAVBAR -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-icon">🍟</span>
+        <span><span class="fry">FRY-DAY</span> <span class="day">NIGHT LIGHTS</span></span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="index.html">Home</a>
+        <a href="order.html">Order</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- LOGIN SCREEN -->
+  <div class="admin-login-overlay" id="loginOverlay">
+    <div class="admin-login-box">
+      <div class="nav-logo" style="justify-content:center;margin-bottom:24px;font-size:1.5rem;">
+        <span class="logo-icon">🍟</span>
+        <span><span class="fry">FRY-DAY</span> <span class="day">NIGHT LIGHTS</span></span>
+      </div>
+      <h3 style="text-align:center;margin-bottom:8px;"><i class="fas fa-lock"></i> Admin Access</h3>
+      <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:24px;">Enter the admin password to continue</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="adminPassword">Password</label>
+          <input type="password" id="adminPassword" required placeholder="Enter admin password" autocomplete="current-password">
+        </div>
+        <p id="loginError" style="color:var(--neon-pink);font-size:0.85rem;margin-bottom:12px;display:none;"></p>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;"><i class="fas fa-sign-in-alt"></i> Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADMIN PAGE -->
+  <main class="admin-page" id="adminDashboard" style="display:none;">
+    <div class="container">
+      <div class="admin-header">
+        <div>
+          <div class="section-label"><i class="fas fa-circle"></i> Dashboard</div>
+          <h2 class="section-title" style="margin-bottom:4px;">Admin Panel</h2>
+          <p style="color: var(--text-muted); font-size:0.9rem;">Manage orders and track your business</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="refreshBtn">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+          <button class="btn btn-primary" id="adminOrderBtn">
+            <i class="fas fa-plus"></i> New Order
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="admin-stats" id="adminStats">
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <div><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Orders</div></div>
+            <div class="stat-icon pink"><i class="fas fa-receipt"></i></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <div><div class="stat-value" id="statPending">0</div><div class="stat-label">Pending</div></div>
+            <div class="stat-icon yellow"><i class="fas fa-hourglass-half"></i></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <div><div class="stat-value" id="statPreparing">0</div><div class="stat-label">Preparing</div></div>
+            <div class="stat-icon cyan"><i class="fas fa-fire-burner"></i></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <div><div class="stat-value" id="statRevenue">₹0</div><div class="stat-label">Revenue</div></div>
+            <div class="stat-icon orange"><i class="fas fa-indian-rupee-sign"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orders -->
+      <div class="orders-section">
+        <div class="orders-table-header">
+          <h3><i class="fas fa-list-ul"></i> Orders</h3>
+          <div class="status-filters" id="statusFilters">
+            <button class="status-filter-btn active" data-status="all">All</button>
+            <button class="status-filter-btn" data-status="pending">Pending</button>
+            <button class="status-filter-btn" data-status="preparing">Preparing</button>
+            <button class="status-filter-btn" data-status="ready">Ready</button>
+            <button class="status-filter-btn" data-status="delivered">Delivered</button>
+            <button class="status-filter-btn" data-status="cancelled">Cancelled</button>
+          </div>
+        </div>
+        <div class="orders-list" id="ordersList">
+          <div class="no-orders">
+            <i class="fas fa-inbox"></i>
+            <p>No orders yet</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ADMIN NEW ORDER MODAL -->
+  <div class="modal-overlay" id="adminOrderModal">
+    <div class="modal" style="max-width:650px;">
+      <h3><i class="fas fa-plus-circle"></i> Create Order for Customer</h3>
+      <form id="adminOrderForm">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="form-group">
+            <label for="adminCustName">Customer Name *</label>
+            <input type="text" id="adminCustName" required placeholder="Customer name">
+          </div>
+          <div class="form-group">
+            <label for="adminCustPhone">Phone *</label>
+            <input type="tel" id="adminCustPhone" required placeholder="Phone number">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="adminOrderType">Order Type</label>
+          <select id="adminOrderType">
+            <option value="dine-in">Dine In</option>
+            <option value="takeaway">Takeaway</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Select Items</label>
+          <div id="adminMenuItems" style="max-height: 250px; overflow-y: auto; background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px;"></div>
+        </div>
+        <div class="form-group">
+          <label>Order Total: <strong id="adminOrderTotal" style="color:var(--neon-yellow);">₹0</strong></label>
+        </div>
+        <div class="form-group">
+          <label for="adminNotes">Notes</label>
+          <textarea id="adminNotes" placeholder="Any special instructions..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="cancelAdminOrder">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

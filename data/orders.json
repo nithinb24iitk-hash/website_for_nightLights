@@ -1,0 +1,25 @@
+[
+  {
+    "id": "1774723795322",
+    "customerName": "Test Customer",
+    "customerPhone": "9876543210",
+    "orderType": "dine-in",
+    "notes": "",
+    "items": [
+      {
+        "name": "Classic Smash Burger",
+        "qty": 1,
+        "price": 149
+      },
+      {
+        "name": "Double Trouble Burger",
+        "qty": 1,
+        "price": 199
+      }
+    ],
+    "total": 348,
+    "placedBy": "customer",
+    "status": "preparing",
+    "createdAt": "2026-03-28T18:49:55.322Z"
+  }
+]
