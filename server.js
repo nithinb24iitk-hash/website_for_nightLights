@@ -4,33 +4,14 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const escapeHtml = require('escape-html');
-const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fryday@admin2026';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'fryday-admin-token-secret';
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/fryday';
-
-// Connect to MongoDB
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('📦 Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
-
-// Database Model
-const orderSchema = new mongoose.Schema({
-  id: String,
-  customerName: String,
-  customerPhone: String,
-  orderType: String,
-  notes: String,
-  status: { type: String, default: 'pending' },
-  items: Array,
-  total: Number,
-  placedBy: String,
-  createdAt: String
-});
-const Order = mongoose.model('Order', orderSchema);
 
 // Security Middleware
 app.use(helmet()); 
@@ -47,25 +28,56 @@ app.use('/api/', limiter);
 
 app.use(express.static('public'));
 
-// GET all orders (admin only)
-app.get('/api/orders', requireAdmin, async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json({ error: 'Database error fetching orders' });
+// Ensure orders file exists
+if (!fs.existsSync(ORDERS_FILE)) {
+  fs.writeFileSync(ORDERS_FILE, JSON.stringify([], null, 2));
+}
+
+function readOrders() {
+  const data = fs.readFileSync(ORDERS_FILE, 'utf8');
+  return JSON.parse(data);
+}
+
+function writeOrders(orders) {
+  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+}
+
+// Admin login
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    res.json({ success: true, token: ADMIN_TOKEN });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
   }
 });
 
+// Auth middleware for admin routes
+function requireAdmin(req, res, next) {
+  const token = req.headers['x-admin-token'];
+  if (token !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// GET all orders (admin only)
+app.get('/api/orders', requireAdmin, (req, res) => {
+  const orders = readOrders();
+  res.json(orders);
+});
+
 // POST new order
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', (req, res) => {
+  const orders = readOrders();
+  
   // Basic input validation/sanitization to prevent XSS
   const customerName = escapeHtml(req.body.customerName || 'Unknown');
   const customerPhone = escapeHtml(req.body.customerPhone || 'N/A');
   const orderType = escapeHtml(req.body.orderType || 'dine-in');
   const notes = escapeHtml(req.body.notes || '');
 
-  const newOrder = new Order({
+  const newOrder = {
     id: Date.now().toString(),
     ...req.body, // safe because it's only read by our controlled JS
     customerName,
@@ -74,45 +86,36 @@ app.post('/api/orders', async (req, res) => {
     notes,
     status: 'pending',
     createdAt: new Date().toISOString()
-  });
+  };
   
   // Cap items array size
   if (newOrder.items && newOrder.items.length > 50) {
      return res.status(400).json({ error: 'Too many items in order' });
   }
 
-  try {
-    await newOrder.save();
-    res.status(201).json(newOrder);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to save order to database' });
-  }
+  orders.unshift(newOrder);
+  writeOrders(orders);
+  res.status(201).json(newOrder);
 });
 
 // PATCH update order status (admin only)
-app.patch('/api/orders/:id/status', requireAdmin, async (req, res) => {
-  try {
-    const order = await Order.findOneAndUpdate(
-      { id: req.params.id },
-      { status: req.body.status },
-      { new: true }
-    );
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    res.json(order);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update order status' });
-  }
+app.patch('/api/orders/:id/status', requireAdmin, (req, res) => {
+  const orders = readOrders();
+  const order = orders.find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  order.status = req.body.status;
+  writeOrders(orders);
+  res.json(order);
 });
 
 // DELETE an order (admin only)
-app.delete('/api/orders/:id', requireAdmin, async (req, res) => {
-  try {
-    const result = await Order.findOneAndDelete({ id: req.params.id });
-    if (!result) return res.status(404).json({ error: 'Order not found' });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete order' });
-  }
+app.delete('/api/orders/:id', requireAdmin, (req, res) => {
+  let orders = readOrders();
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Order not found' });
+  orders.splice(idx, 1);
+  writeOrders(orders);
+  res.json({ success: true });
 });
 
 app.listen(PORT, () => {
