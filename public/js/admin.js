@@ -7,6 +7,8 @@ let allOrders = [];
 let currentFilter = 'all';
 let adminCart = {};
 let adminToken = sessionStorage.getItem('adminToken') || '';
+let dashboardInitialized = false;
+let ordersPollerId = null;
 
 const STATUS_FLOW = {
   pending: 'preparing',
@@ -22,20 +24,7 @@ function authHeaders() {
   };
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  // Check login
-  const token = sessionStorage.getItem('adminToken');
-  if (!token) {
-    document.getElementById('loginOverlay').style.display = 'flex';
-  } else {
-    document.getElementById('loginOverlay').style.display = 'none';
-    document.getElementById('dashboardContent').style.display = 'block';
-    await fetchMenu();
-    fetchOrders();
-    // Poll every 10s
-    setInterval(fetchOrders, 10000);
-  }
-
+document.addEventListener('DOMContentLoaded', () => {
   // Hamburger
   const hamburger = document.getElementById('hamburger');
   const navLinks = document.getElementById('navLinks');
@@ -55,6 +44,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Setup login
   setupLogin();
+
+  if (adminToken) {
+    showDashboard();
+  } else {
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    document.getElementById('loginOverlay').style.display = 'flex';
+  }
 });
 
 // Fetch menu from DB
@@ -102,17 +98,26 @@ function setupLogin() {
   });
 }
 
-function showDashboard() {
+async function showDashboard() {
   document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('loginOverlay').style.display = 'none';
   document.getElementById('adminDashboard').style.display = 'block';
 
-  fetchOrders();
-  fetchMenu();
-  setupStatusFilters();
-  setupAdminOrderModal();
+  await Promise.all([fetchOrders(), fetchMenu()]);
 
-  document.getElementById('refreshBtn').addEventListener('click', fetchOrders);
-  setInterval(fetchOrders, 15000);
+  if (!dashboardInitialized) {
+    setupStatusFilters();
+    setupAdminOrderModal();
+
+    document.getElementById('refreshBtn').addEventListener('click', fetchOrders);
+    ordersPollerId = setInterval(fetchOrders, 15000);
+    dashboardInitialized = true;
+    return;
+  }
+
+  if (!ordersPollerId) {
+    ordersPollerId = setInterval(fetchOrders, 15000);
+  }
 }
 
 // Fetch orders from API
