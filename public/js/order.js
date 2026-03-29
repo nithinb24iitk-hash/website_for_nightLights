@@ -86,6 +86,12 @@ function addToCart(id) {
     cart.push({ ...item, qty: 1 });
   }
   renderCart();
+  const sidebar = document.getElementById('cartSidebar');
+  if (sidebar) {
+    sidebar.classList.remove('bump');
+    void sidebar.offsetWidth; // trigger DOM reflow to restart animation
+    sidebar.classList.add('bump');
+  }
   showToast(`${item.name} added to cart!`, 'success');
 }
 

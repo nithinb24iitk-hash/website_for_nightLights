@@ -22,7 +22,20 @@ function authHeaders() {
   };
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check login
+  const token = sessionStorage.getItem('adminToken');
+  if (!token) {
+    document.getElementById('loginOverlay').style.display = 'flex';
+  } else {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('dashboardContent').style.display = 'block';
+    await fetchMenu();
+    fetchOrders();
+    // Poll every 10s
+    setInterval(fetchOrders, 10000);
+  }
+
   // Hamburger
   const hamburger = document.getElementById('hamburger');
   const navLinks = document.getElementById('navLinks');
@@ -31,13 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
     navLinks.classList.toggle('open');
   });
 
+  // Add Item Form Submit
+  const addForm = document.getElementById('addMenuItemForm');
+  if (addForm) {
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await addMenuItem();
+    });
+  }
+
   // Setup login
   setupLogin();
-
-  // If already logged in, show dashboard
-  if (adminToken) {
-    showDashboard();
-  }
 });
 
 // Fetch menu from DB
@@ -279,7 +296,7 @@ function setupAdminOrderModal() {
 
     // Update total
     const total = Object.entries(adminCart).reduce((sum, [itemId, qty]) => {
-      const item = MENU_ITEMS.find(i => i.id === parseInt(itemId));
+      const item = dynamicMenu.find(i => i.id === parseInt(itemId));
       return sum + (item ? item.price * qty : 0);
     }, 0);
     totalDisplay.textContent = `₹${total}`;
@@ -300,7 +317,7 @@ function setupAdminOrderModal() {
     e.preventDefault();
 
     const items = Object.entries(adminCart).map(([itemId, qty]) => {
-      const item = MENU_ITEMS.find(i => i.id === parseInt(itemId));
+      const item = dynamicMenu.find(i => i.id === parseInt(itemId));
       return { name: item.name, qty, price: item.price };
     }).filter(i => i.qty > 0);
 

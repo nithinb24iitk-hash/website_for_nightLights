@@ -30,7 +30,7 @@
 
   <!-- LOGIN SCREEN -->
   <div class="admin-login-overlay" id="loginOverlay">
-    <div class="admin-login-box">
+    <div class="admin-login-box glass-premium">
       <div class="nav-logo" style="justify-content:center;margin-bottom:24px;font-size:1.5rem;">
         <span class="logo-icon">🍟</span>
         <span><span class="fry">FRY-DAY</span> <span class="day">NIGHT LIGHTS</span></span>
@@ -49,7 +49,7 @@
   </div>
 
   <!-- ADMIN PAGE -->
-  <main class="admin-page" id="adminDashboard" style="display:none;">
+  <main class="admin-page" id="adminDashboard" style="display:none; background: radial-gradient(circle at top left, rgba(0,240,255,.08), transparent 22%), radial-gradient(circle at top right, rgba(255,45,117,.08), transparent 24%), #0b0f15;">
     <div class="container">
       <div class="admin-header">
         <div>
@@ -60,31 +60,31 @@
         <div class="admin-actions">
             <button class="btn btn-secondary" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button class="btn btn-primary" id="adminOrderBtn"><i class="fas fa-plus"></i> New Order</button>
-            <button class="btn btn-secondary" style="border: 1px solid var(--neon-pink); color: var(--neon-pink); background: rgba(255,45,117,0.1);" onclick="document.getElementById('menuManagerModal').classList.add('active')"><i class="fas fa-edit"></i> Manage Menu</button>
+            <button class="btn btn-secondary" style="border: 1px solid var(--neon-pink); color: var(--neon-pink); background: rgba(255,45,117,0.1);" onclick="openMenuManager()"><i class="fas fa-edit"></i> Manage Menu</button>
         </div>
       </div>
 
       <!-- Stats -->
       <div class="admin-stats" id="adminStats">
-        <div class="stat-card">
+        <div class="stat-card glass-premium">
           <div class="stat-card-header">
             <div><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Orders</div></div>
             <div class="stat-icon pink"><i class="fas fa-receipt"></i></div>
           </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card glass-premium">
           <div class="stat-card-header">
             <div><div class="stat-value" id="statPending">0</div><div class="stat-label">Pending</div></div>
             <div class="stat-icon yellow"><i class="fas fa-hourglass-half"></i></div>
           </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card glass-premium">
           <div class="stat-card-header">
             <div><div class="stat-value" id="statPreparing">0</div><div class="stat-label">Preparing</div></div>
             <div class="stat-icon cyan"><i class="fas fa-fire-burner"></i></div>
           </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card glass-premium">
           <div class="stat-card-header">
             <div><div class="stat-value" id="statRevenue">₹0</div><div class="stat-label">Revenue</div></div>
             <div class="stat-icon orange"><i class="fas fa-indian-rupee-sign"></i></div>
