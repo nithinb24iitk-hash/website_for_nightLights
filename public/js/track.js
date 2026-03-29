@@ -390,7 +390,7 @@ function setupTrackingActions() {
 
     history.replaceState({}, '', '/track');
     renderSelectedOrder(null);
-    showToast('Order removed from this device', 'success');
+    showToast('Order removed from your recent list', 'success');
   });
 }
 
@@ -492,7 +492,7 @@ function renderSelectedOrder(order) {
   addMoreBtn.innerHTML = order.isPaid || order.status === 'cancelled'
     ? '<i class="fas fa-utensils"></i> Start New Order'
     : '<i class="fas fa-plus"></i> Add More Items';
-  clearBtn.textContent = order.isPaid || order.status === 'cancelled' ? 'Clear from this device' : 'Hide on this device';
+  clearBtn.textContent = order.isPaid || order.status === 'cancelled' ? 'Remove from Recent' : 'Hide This Order';
 }
 
 function renderTrackingProgress(order) {
@@ -532,7 +532,7 @@ function renderDeviceRecentList() {
     .filter(Boolean);
 
   if (!items.length) {
-    listEl.innerHTML = '<div class="tracking-list-empty">No orders saved on this device yet.</div>';
+    listEl.innerHTML = '<div class="tracking-list-empty">No recent orders yet.</div>';
     return;
   }
 

@@ -34,7 +34,7 @@
         <div>
           <div class="section-label"><i class="fas fa-circle"></i> Live Tracking</div>
           <h2 class="section-title">Keep up with your order in real time</h2>
-          <p class="section-subtitle">Track your current order, pull up recent ones from this device, or search by mobile number or order ID from another phone.</p>
+          <p class="section-subtitle">Track your current order, reopen recent ones instantly, or search by mobile number or order ID from anywhere.</p>
         </div>
         <div class="tracking-hero-actions">
           <a href="/order?addMore=1" class="btn btn-primary" id="trackingAddMoreTop"><i class="fas fa-plus"></i> Add More Items</a>
@@ -73,7 +73,7 @@
 
             <div class="tracking-actions">
               <a href="/order?addMore=1" class="btn btn-primary" id="trackingAddMoreBtn"><i class="fas fa-plus"></i> Add More Items</a>
-              <button type="button" class="btn btn-ghost" id="trackingClearBtn">Hide on this device</button>
+              <button type="button" class="btn btn-ghost" id="trackingClearBtn">Hide This Order</button>
             </div>
           </article>
 
@@ -109,17 +109,17 @@
 
           <section class="tracking-card glass-premium">
             <div class="tracking-side-head">
-              <h3><i class="fas fa-clock-rotate-left"></i> Recent On This Device</h3>
-              <p>Your in-progress and recent orders stay here until you clear them.</p>
+              <h3><i class="fas fa-clock-rotate-left"></i> Recent Orders</h3>
+              <p>Your latest active and completed orders stay here until you clear them.</p>
             </div>
             <div class="tracking-list" id="deviceRecentList">
-              <div class="tracking-list-empty">No orders saved on this device yet.</div>
+              <div class="tracking-list-empty">No recent orders yet.</div>
             </div>
           </section>
 
           <section class="tracking-card glass-premium" id="phoneResultsCard" hidden>
             <div class="tracking-side-head">
-              <h3><i class="fas fa-mobile-screen"></i> Recent On This Number</h3>
+              <h3><i class="fas fa-mobile-screen"></i> Orders for This Number</h3>
               <p id="phoneResultsMeta">Showing the latest orders for this phone number.</p>
             </div>
             <div class="tracking-list" id="phoneResultsList"></div>
