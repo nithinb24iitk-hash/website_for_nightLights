@@ -21,6 +21,7 @@
       <div class="nav-links" id="navLinks">
         <a href="/">Home</a>
         <a href="/order" class="active">Order</a>
+        <a href="/track">Track Order</a>
       </div>
       <button class="hamburger" id="hamburger" aria-label="Toggle menu">
         <span></span><span></span><span></span>
@@ -36,6 +37,17 @@
         <h2 class="section-title">Our Menu</h2>
         <p class="section-subtitle">Choose your favorites and we'll have them ready for you.</p>
       </div>
+
+      <section class="active-order-banner glass-premium" id="activeOrderBanner" hidden>
+        <div class="active-order-banner-copy">
+          <span class="section-label"><i class="fas fa-circle"></i> Tracking Active Order</span>
+          <h3>Your current order is still live</h3>
+          <p>Place more items as a fresh order and jump back to tracking anytime without losing the order already in progress.</p>
+        </div>
+        <div class="active-order-banner-actions">
+          <a href="/track" class="btn btn-secondary"><i class="fas fa-location-dot"></i> View Tracking</a>
+        </div>
+      </section>
 
       <!-- Filters -->
       <div class="menu-filters" id="menuFilters">

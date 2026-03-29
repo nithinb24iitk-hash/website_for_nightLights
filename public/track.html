@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Order — FRY-DAY NIGHT LIGHTS</title>
+  <meta name="description" content="Track your Fry-Day Night Lights Cafe order, reopen recent orders, and continue ordering while your current ticket is in progress.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="icon" type="image/png" href="images/burger.png">
+</head>
+<body class="page-transition">
+
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container">
+      <a href="/" class="nav-logo">
+        <span class="logo-icon">🍟</span>
+        <span><span class="fry">FRY-DAY</span> <span class="day">NIGHT LIGHTS</span></span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="/">Home</a>
+        <a href="/order">Order</a>
+        <a href="/track" class="active">Track Order</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <main class="tracking-page">
+    <div class="container">
+      <section class="tracking-hero glass-premium">
+        <div>
+          <div class="section-label"><i class="fas fa-circle"></i> Live Tracking</div>
+          <h2 class="section-title">Keep up with your order in real time</h2>
+          <p class="section-subtitle">Track your current order, pull up recent ones from this device, or search by mobile number or order ID from another phone.</p>
+        </div>
+        <div class="tracking-hero-actions">
+          <a href="/order?addMore=1" class="btn btn-primary" id="trackingAddMoreTop"><i class="fas fa-plus"></i> Add More Items</a>
+          <a href="/order" class="btn btn-secondary"><i class="fas fa-utensils"></i> Browse Menu</a>
+        </div>
+      </section>
+
+      <div class="tracking-layout">
+        <section class="tracking-main">
+          <article class="tracking-card glass-premium" id="trackingStateCard" hidden>
+            <div class="tracking-card-head">
+              <div>
+                <span class="tracking-kicker" id="trackingKicker">Current Order</span>
+                <h3 id="trackingTitle">Order Status</h3>
+                <p id="trackingStatusCopy">We’ll update this card automatically as your order moves ahead.</p>
+              </div>
+              <div class="tracking-head-meta">
+                <span class="order-id" id="trackingOrderId">FDNL-00000000-000</span>
+                <span class="tracking-status-badge" id="trackingStatusBadge">Pending</span>
+              </div>
+            </div>
+
+            <div class="tracking-progress" id="trackingProgress"></div>
+
+            <div class="tracking-meta-grid" id="trackingMetaGrid"></div>
+
+            <div class="tracking-alert" id="trackingAlert"></div>
+
+            <div class="tracking-summary">
+              <div class="tracking-summary-head">
+                <h4><i class="fas fa-receipt"></i> Order Summary</h4>
+                <span id="trackingItemCount">0 items</span>
+              </div>
+              <div class="tracking-summary-items" id="trackingSummaryItems"></div>
+            </div>
+
+            <div class="tracking-actions">
+              <a href="/order?addMore=1" class="btn btn-primary" id="trackingAddMoreBtn"><i class="fas fa-plus"></i> Add More Items</a>
+              <button type="button" class="btn btn-ghost" id="trackingClearBtn">Hide on this device</button>
+            </div>
+          </article>
+
+          <article class="tracking-empty glass-premium" id="trackingEmptyState">
+            <i class="fas fa-location-crosshairs"></i>
+            <h3>No order selected yet</h3>
+            <p>Use your order ID, mobile number, or recent orders below to start tracking.</p>
+          </article>
+        </section>
+
+        <aside class="tracking-sidebar">
+          <section class="tracking-card glass-premium">
+            <div class="tracking-side-head">
+              <h3><i class="fas fa-magnifying-glass"></i> Find an Order</h3>
+              <p>Use order ID if you have it. Otherwise enter a phone number to fetch recent orders.</p>
+            </div>
+
+            <form class="tracking-lookup-form" id="trackingLookupForm">
+              <div class="form-group">
+                <label for="lookupOrderId">Order ID</label>
+                <input type="text" id="lookupOrderId" placeholder="FDNL-20260330-001">
+              </div>
+              <div class="form-group">
+                <label for="lookupPhone">Phone Number</label>
+                <input type="tel" id="lookupPhone" inputmode="numeric" maxlength="15" placeholder="Enter your phone number">
+              </div>
+              <div class="tracking-lookup-actions">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Find Order</button>
+                <button type="button" class="btn btn-ghost" id="lookupResetBtn">Reset</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="tracking-card glass-premium">
+            <div class="tracking-side-head">
+              <h3><i class="fas fa-clock-rotate-left"></i> Recent On This Device</h3>
+              <p>Your in-progress and recent orders stay here until you clear them.</p>
+            </div>
+            <div class="tracking-list" id="deviceRecentList">
+              <div class="tracking-list-empty">No orders saved on this device yet.</div>
+            </div>
+          </section>
+
+          <section class="tracking-card glass-premium" id="phoneResultsCard" hidden>
+            <div class="tracking-side-head">
+              <h3><i class="fas fa-mobile-screen"></i> Recent On This Number</h3>
+              <p id="phoneResultsMeta">Showing the latest orders for this phone number.</p>
+            </div>
+            <div class="tracking-list" id="phoneResultsList"></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/track.js"></script>
+</body>
+</html>

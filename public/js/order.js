@@ -5,6 +5,145 @@
 let dynamicMenu = [];
 
 let cart = [];
+const TRACKING_STORAGE_KEY = 'frydayTrackingState';
+
+function readTrackingState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TRACKING_STORAGE_KEY) || '{}');
+    return {
+      activeOrderIds: Array.isArray(parsed.activeOrderIds) ? parsed.activeOrderIds : [],
+      recentOrders: Array.isArray(parsed.recentOrders) ? parsed.recentOrders : [],
+      selectedOrderId: String(parsed.selectedOrderId || ''),
+      customerPhone: String(parsed.customerPhone || ''),
+      customerName: String(parsed.customerName || '')
+    };
+  } catch (err) {
+    return {
+      activeOrderIds: [],
+      recentOrders: [],
+      selectedOrderId: '',
+      customerPhone: '',
+      customerName: ''
+    };
+  }
+}
+
+function writeTrackingState(state) {
+  localStorage.setItem(TRACKING_STORAGE_KEY, JSON.stringify({
+    activeOrderIds: state.activeOrderIds || [],
+    recentOrders: state.recentOrders || [],
+    selectedOrderId: state.selectedOrderId || '',
+    customerPhone: state.customerPhone || '',
+    customerName: state.customerName || ''
+  }));
+}
+
+function rememberTrackedOrder(order) {
+  const state = readTrackingState();
+  const recentEntry = {
+    id: order.id,
+    createdAt: order.createdAt || new Date().toISOString(),
+    customerPhone: order.customerPhone || '',
+    customerName: order.customerName || ''
+  };
+
+  state.recentOrders = [
+    recentEntry,
+    ...state.recentOrders.filter(entry => entry.id !== order.id)
+  ].slice(0, 10);
+
+  if (!order.isPaid && order.status !== 'cancelled') {
+    state.activeOrderIds = [
+      order.id,
+      ...state.activeOrderIds.filter(id => id !== order.id)
+    ].slice(0, 6);
+  }
+
+  state.selectedOrderId = order.id;
+  state.customerPhone = order.customerPhone || state.customerPhone;
+  state.customerName = order.customerName || state.customerName;
+  writeTrackingState(state);
+}
+
+function getAddMoreMode() {
+  return new URLSearchParams(window.location.search).get('addMore') === '1';
+}
+
+async function refreshTrackingStateFromServer() {
+  const state = readTrackingState();
+  const ids = state.recentOrders.map(entry => entry.id).filter(Boolean).slice(0, 10);
+
+  if (!ids.length) {
+    return state;
+  }
+
+  try {
+    const res = await fetch(`/api/orders/public?ids=${encodeURIComponent(ids.join(','))}`);
+    if (!res.ok) {
+      return state;
+    }
+
+    const orders = await res.json();
+    const recentMap = new Map(state.recentOrders.map(entry => [entry.id, entry]));
+
+    orders.forEach(order => {
+      recentMap.set(order.id, {
+        id: order.id,
+        createdAt: order.createdAt || new Date().toISOString(),
+        customerPhone: order.customerPhone || '',
+        customerName: order.customerName || ''
+      });
+      if (order.customerPhone) state.customerPhone = order.customerPhone;
+      if (order.customerName) state.customerName = order.customerName;
+    });
+
+    state.recentOrders = [...recentMap.values()]
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, 10);
+    state.activeOrderIds = orders
+      .filter(order => !order.isPaid && order.status !== 'cancelled')
+      .map(order => order.id)
+      .slice(0, 6);
+
+    if (!state.recentOrders.find(entry => entry.id === state.selectedOrderId)) {
+      state.selectedOrderId = state.activeOrderIds[0] || state.recentOrders[0]?.id || '';
+    }
+
+    writeTrackingState(state);
+    return state;
+  } catch (err) {
+    return state;
+  }
+}
+
+async function handleActiveOrderRouting() {
+  const state = await refreshTrackingStateFromServer();
+  const hasActiveOrder = state.activeOrderIds.length > 0;
+  const addMoreMode = getAddMoreMode();
+
+  if (hasActiveOrder && !addMoreMode) {
+    window.location.replace('/track');
+    return true;
+  }
+
+  const banner = document.getElementById('activeOrderBanner');
+  if (banner) {
+    banner.hidden = !(hasActiveOrder && addMoreMode);
+  }
+
+  if (addMoreMode) {
+    const nameInput = document.getElementById('customerName');
+    const phoneInput = document.getElementById('customerPhone');
+    if (nameInput && state.customerName) {
+      nameInput.value = state.customerName;
+    }
+    if (phoneInput && state.customerPhone) {
+      phoneInput.value = state.customerPhone;
+    }
+  }
+
+  return false;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Hamburger
@@ -14,6 +153,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     hamburger.classList.toggle('active');
     navLinks.classList.toggle('open');
   });
+
+  if (await handleActiveOrderRouting()) {
+    return;
+  }
 
   try {
     const res = await fetch('/api/menu');
@@ -336,11 +479,13 @@ function setupCheckout() {
 
       if (res.ok) {
         const createdOrder = await res.json();
+        rememberTrackedOrder(createdOrder);
+        sessionStorage.setItem('trackingFlashMessage', `Order ${createdOrder.id} placed successfully. Live tracking is ready.`);
         cart = [];
         renderCart();
         closeCheckout();
         form.reset();
-        showToast(`🎉 Order ${createdOrder.id} placed successfully! We\'ll prepare it right away.`, 'success');
+        window.location.href = `/track?orderId=${encodeURIComponent(createdOrder.id)}`;
       } else {
         showToast('Failed to place order. Please try again.', 'error');
       }

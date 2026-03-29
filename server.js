@@ -79,6 +79,36 @@ async function generateOrderId(now = new Date()) {
   return `FDNL-${dateKey}-${String(counter.seq).padStart(3, '0')}`;
 }
 
+function normalizePhone(value = '') {
+  return String(value || '').replace(/\D/g, '').slice(-15);
+}
+
+function buildFlexiblePhonePattern(digits) {
+  return new RegExp(digits.split('').join('\\D*'));
+}
+
+function normalizeOrderId(value = '') {
+  const normalized = String(value || '').trim().toUpperCase();
+  return /^[A-Z0-9-]{4,32}$/.test(normalized) ? normalized : '';
+}
+
+function serializePublicOrder(order) {
+  return {
+    id: order.id,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    orderType: order.orderType,
+    notes: order.notes,
+    status: order.status,
+    items: order.items || [],
+    total: Number(order.total) || 0,
+    placedBy: order.placedBy,
+    createdAt: order.createdAt,
+    isPaid: Boolean(order.isPaid),
+    paidAt: order.paidAt || ''
+  };
+}
+
 // Seed Default Menu if Empty
 async function seedMenu() {
   const count = await MenuItem.countDocuments();
@@ -215,6 +245,67 @@ app.patch('/api/menu/:id/soldout', requireAdmin, async (req, res) => {
     res.json({ success: true, isSoldOut: item.isSoldOut });
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle status' });
+  }
+});
+
+// GET public orders by ids or phone number
+app.get('/api/orders/public', async (req, res) => {
+  try {
+    const idsParam = String(req.query.ids || '').trim();
+    const phoneDigits = normalizePhone(req.query.phone || '');
+
+    if (idsParam) {
+      const ids = idsParam
+        .split(',')
+        .map(normalizeOrderId)
+        .filter(Boolean)
+        .slice(0, 10);
+
+      if (!ids.length) {
+        return res.status(400).json({ error: 'Provide valid order IDs' });
+      }
+
+      const orders = await Order.find({ id: { $in: ids } }).sort({ createdAt: -1 });
+      const orderMap = new Map(orders.map(order => [String(order.id), serializePublicOrder(order)]));
+
+      return res.json(ids.map(id => orderMap.get(id)).filter(Boolean));
+    }
+
+    if (phoneDigits) {
+      if (phoneDigits.length < 6) {
+        return res.status(400).json({ error: 'Enter a valid phone number' });
+      }
+
+      const phonePattern = buildFlexiblePhonePattern(phoneDigits);
+      const orders = await Order.find({ customerPhone: { $regex: phonePattern } })
+        .sort({ createdAt: -1 })
+        .limit(8);
+
+      return res.json(orders.map(serializePublicOrder));
+    }
+
+    return res.status(400).json({ error: 'Provide order IDs or phone number' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch tracked orders' });
+  }
+});
+
+// GET a single public order by id
+app.get('/api/orders/public/:id', async (req, res) => {
+  try {
+    const orderId = normalizeOrderId(req.params.id);
+    if (!orderId) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    const order = await Order.findOne({ id: orderId });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(serializePublicOrder(order));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch order' });
   }
 });
 
