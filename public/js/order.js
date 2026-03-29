@@ -153,13 +153,47 @@ function renderMobileCartBar(totalItems, totalPrice) {
   mobileBar.hidden = totalItems === 0;
 }
 
+function getSelectedOrderType() {
+  return document.querySelector('input[name="orderType"]:checked')?.value || 'dine-in';
+}
+
+function renderCheckoutMeta(totalItems) {
+  const itemsEl = document.getElementById('checkoutStatItems');
+  const modeEl = document.getElementById('checkoutStatMode');
+  const paymentEl = document.getElementById('checkoutStatPayment');
+  const actionNoteEl = document.getElementById('checkoutActionNote');
+  const orderType = getSelectedOrderType();
+
+  if (itemsEl) {
+    itemsEl.textContent = String(totalItems);
+  }
+
+  if (modeEl) {
+    modeEl.textContent = orderType === 'takeaway' ? 'Takeaway' : 'Dine In';
+  }
+
+  if (paymentEl) {
+    paymentEl.textContent = orderType === 'takeaway' ? 'At Pickup' : 'At Table';
+  }
+
+  if (actionNoteEl) {
+    actionNoteEl.textContent = orderType === 'takeaway'
+      ? 'Payment is collected when you pick up the order.'
+      : 'Payment is collected at the cafe after the order is served.';
+  }
+}
+
 function renderCheckoutSummary(totalItems, totalPrice) {
   const summaryEl = document.getElementById('checkoutSummary');
   const submitBtn = document.querySelector('#orderForm button[type="submit"]');
+  const actionTotalEl = document.getElementById('checkoutActionTotal');
 
-  if (!summaryEl || !submitBtn) return;
+  if (!summaryEl || !submitBtn || !actionTotalEl) return;
+
+  renderCheckoutMeta(totalItems);
 
   if (cart.length === 0) {
+    actionTotalEl.textContent = '₹0';
     summaryEl.innerHTML = `
       <div class="checkout-summary-empty">
         <i class="fas fa-bag-shopping"></i>
@@ -171,6 +205,7 @@ function renderCheckoutSummary(totalItems, totalPrice) {
   }
 
   submitBtn.disabled = false;
+  actionTotalEl.textContent = `₹${totalPrice}`;
 
   summaryEl.innerHTML = `
     <div class="checkout-summary-head">
@@ -221,15 +256,24 @@ function setupCheckout() {
   const checkoutBtn = document.getElementById('checkoutBtn');
   const mobileCheckoutBtn = document.getElementById('mobileCartBar');
   const cancelBtn = document.getElementById('cancelCheckout');
+  const closeBtn = document.getElementById('checkoutClose');
   const form = document.getElementById('orderForm');
+  const confirmBtn = document.getElementById('confirmCheckoutBtn');
+  const orderTypeInputs = document.querySelectorAll('input[name="orderType"]');
+  let isSubmitting = false;
+
+  const getTotals = () => ({
+    items: cart.reduce((sum, c) => sum + c.qty, 0),
+    total: cart.reduce((sum, c) => sum + c.price * c.qty, 0)
+  });
 
   const openCheckout = () => {
     if (cart.length === 0) return;
-    renderCheckoutSummary(
-      cart.reduce((sum, c) => sum + c.qty, 0),
-      cart.reduce((sum, c) => sum + c.price * c.qty, 0)
-    );
+    const totals = getTotals();
+    renderCheckoutSummary(totals.items, totals.total);
     modal.classList.add('active');
+    const firstEmptyField = form.querySelector('input:invalid, textarea:invalid') || document.getElementById('customerName');
+    firstEmptyField?.focus({ preventScroll: true });
   };
 
   const closeCheckout = () => {
@@ -243,20 +287,40 @@ function setupCheckout() {
   }
 
   cancelBtn.addEventListener('click', closeCheckout);
+  closeBtn?.addEventListener('click', closeCheckout);
+
+  orderTypeInputs.forEach(input => {
+    input.addEventListener('change', () => {
+      const totals = getTotals();
+      renderCheckoutSummary(totals.items, totals.total);
+    });
+  });
 
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeCheckout();
   });
 
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('active')) {
+      closeCheckout();
+    }
+  });
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isSubmitting) return;
+
+    isSubmitting = true;
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Placing Order';
+    }
 
     const orderData = {
       customerName: document.getElementById('customerName').value,
       customerPhone: document.getElementById('customerPhone').value,
-      orderType: document.getElementById('orderType').value,
+      orderType: getSelectedOrderType(),
       notes: document.getElementById('orderNotes').value,
       items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
       total: cart.reduce((sum, c) => sum + c.price * c.qty, 0),
@@ -282,6 +346,14 @@ function setupCheckout() {
       }
     } catch (err) {
       showToast('Connection error. Please try again.', 'error');
+    } finally {
+      isSubmitting = false;
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Place Order';
+      }
+      const totals = getTotals();
+      renderCheckoutSummary(totals.items, totals.total);
     }
   });
 }

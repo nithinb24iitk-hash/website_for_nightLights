@@ -28,7 +28,9 @@ const orderSchema = new mongoose.Schema({
   items: Array,
   total: Number,
   placedBy: String,
-  createdAt: String
+  createdAt: String,
+  isPaid: { type: Boolean, default: false },
+  paidAt: String
 });
 const Order = mongoose.model('Order', orderSchema);
 
@@ -254,7 +256,9 @@ app.post('/api/orders', async (req, res) => {
       items,
       total,
       placedBy,
-      createdAt: now.toISOString()
+      createdAt: now.toISOString(),
+      isPaid: false,
+      paidAt: ''
     });
 
     await newOrder.save();
@@ -276,6 +280,28 @@ app.patch('/api/orders/:id/status', requireAdmin, async (req, res) => {
     res.json(order);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
+// MARK order as paid (admin only, after delivery)
+app.patch('/api/orders/:id/payment', requireAdmin, async (req, res) => {
+  try {
+    const order = await Order.findOne({ id: req.params.id });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ error: 'Only delivered orders can be marked paid' });
+    }
+    if (order.isPaid) {
+      return res.json(order);
+    }
+
+    order.isPaid = true;
+    order.paidAt = new Date().toISOString();
+    await order.save();
+
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update payment status' });
   }
 });
 

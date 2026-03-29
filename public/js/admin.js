@@ -9,6 +9,7 @@ let adminCart = {};
 let adminToken = sessionStorage.getItem('adminToken') || '';
 let dashboardInitialized = false;
 let ordersPollerId = null;
+const APP_TIME_ZONE = 'Asia/Kolkata';
 
 const STATUS_FLOW = {
   pending: 'preparing',
@@ -22,6 +23,47 @@ function formatOrderId(orderId) {
     return value;
   }
   return `LEGACY-${value.slice(-6)}`;
+}
+
+function getDateParts(dateLike = new Date()) {
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  return {
+    year: parts.find(part => part.type === 'year')?.value || '0000',
+    month: parts.find(part => part.type === 'month')?.value || '00',
+    day: parts.find(part => part.type === 'day')?.value || '00'
+  };
+}
+
+function getDateKey(dateLike = new Date()) {
+  const { year, month, day } = getDateParts(dateLike);
+  return `${year}-${month}-${day}`;
+}
+
+function formatCurrency(value = 0) {
+  return `₹${Number(value || 0).toLocaleString('en-IN')}`;
+}
+
+function formatDayLabel(dateKey) {
+  if (!dateKey) return 'Selected day';
+  const [year, month, day] = dateKey.split('-');
+  const date = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: APP_TIME_ZONE,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  }).format(date);
+}
+
+function getOrderTotal(order) {
+  return Number(order?.total) || 0;
 }
 
 // Helper: get auth headers
@@ -115,6 +157,7 @@ async function showDashboard() {
 
   if (!dashboardInitialized) {
     setupStatusFilters();
+    setupEarningsTracker();
     setupAdminOrderModal();
 
     document.getElementById('refreshBtn').addEventListener('click', fetchOrders);
@@ -142,6 +185,7 @@ async function fetchOrders() {
     }
     allOrders = await res.json();
     updateStats();
+    renderEarningsTracker();
     renderOrders();
   } catch (err) {
     console.error('Failed to fetch orders:', err);
@@ -153,14 +197,118 @@ function updateStats() {
   const total = allOrders.length;
   const pending = allOrders.filter(o => o.status === 'pending').length;
   const preparing = allOrders.filter(o => o.status === 'preparing').length;
-  const revenue = allOrders
-    .filter(o => o.status !== 'cancelled')
-    .reduce((sum, o) => sum + (o.total || 0), 0);
+  const awaitingPayment = allOrders.filter(o => o.status === 'delivered' && !o.isPaid).length;
+  const paidRevenue = allOrders
+    .filter(o => o.isPaid && o.status !== 'cancelled')
+    .reduce((sum, o) => sum + getOrderTotal(o), 0);
+  const todayKey = getDateKey(new Date());
+  const todayEarnings = allOrders
+    .filter(o => o.isPaid && o.paidAt && getDateKey(o.paidAt) === todayKey)
+    .reduce((sum, o) => sum + getOrderTotal(o), 0);
 
   document.getElementById('statTotal').textContent = total;
   document.getElementById('statPending').textContent = pending;
   document.getElementById('statPreparing').textContent = preparing;
-  document.getElementById('statRevenue').textContent = `₹${revenue.toLocaleString()}`;
+  document.getElementById('statAwaitingPayment').textContent = awaitingPayment;
+  document.getElementById('statPaidRevenue').textContent = formatCurrency(paidRevenue);
+  document.getElementById('statTodayEarnings').textContent = formatCurrency(todayEarnings);
+}
+
+function setupEarningsTracker() {
+  const dateInput = document.getElementById('earningsDate');
+  const earningsList = document.getElementById('earningsList');
+  if (!dateInput || !earningsList) return;
+
+  if (!dateInput.value) {
+    dateInput.value = getDateKey(new Date());
+  }
+
+  dateInput.addEventListener('change', renderEarningsTracker);
+  earningsList.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-earnings-day]');
+    if (!row) return;
+    dateInput.value = row.dataset.earningsDay;
+    renderEarningsTracker();
+  });
+}
+
+function renderEarningsTracker() {
+  const dateInput = document.getElementById('earningsDate');
+  const selectedValueEl = document.getElementById('selectedDayEarnings');
+  const selectedMetaEl = document.getElementById('selectedDayMeta');
+  const pendingValueEl = document.getElementById('pendingCollectionValue');
+  const pendingMetaEl = document.getElementById('pendingCollectionMeta');
+  const detailTitleEl = document.getElementById('earningsDetailTitle');
+  const detailCountEl = document.getElementById('earningsDetailCount');
+  const detailListEl = document.getElementById('earningsDetailList');
+  const earningsList = document.getElementById('earningsList');
+
+  if (!dateInput || !selectedValueEl || !selectedMetaEl || !pendingValueEl || !pendingMetaEl || !detailTitleEl || !detailCountEl || !detailListEl || !earningsList) {
+    return;
+  }
+
+  if (!dateInput.value) {
+    dateInput.value = getDateKey(new Date());
+  }
+
+  const selectedDay = dateInput.value;
+  const paidByDay = new Map();
+
+  allOrders
+    .filter(order => order.isPaid && order.paidAt)
+    .forEach(order => {
+      const key = getDateKey(order.paidAt);
+      const bucket = paidByDay.get(key) || { total: 0, count: 0 };
+      bucket.total += getOrderTotal(order);
+      bucket.count += 1;
+      paidByDay.set(key, bucket);
+    });
+
+  const selectedBucket = paidByDay.get(selectedDay) || { total: 0, count: 0 };
+  const pendingCollectionOrders = allOrders.filter(order => order.status === 'delivered' && !order.isPaid);
+  const pendingCollectionTotal = pendingCollectionOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+  const selectedOrders = allOrders
+    .filter(order => order.isPaid && order.paidAt && getDateKey(order.paidAt) === selectedDay)
+    .sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt));
+
+  selectedValueEl.textContent = formatCurrency(selectedBucket.total);
+  selectedMetaEl.textContent = `${selectedBucket.count} paid order${selectedBucket.count === 1 ? '' : 's'} on ${formatDayLabel(selectedDay)}`;
+  pendingValueEl.textContent = formatCurrency(pendingCollectionTotal);
+  pendingMetaEl.textContent = `${pendingCollectionOrders.length} delivered unpaid order${pendingCollectionOrders.length === 1 ? '' : 's'}`;
+  detailTitleEl.textContent = `Paid orders for ${formatDayLabel(selectedDay)}`;
+  detailCountEl.textContent = `${selectedOrders.length} order${selectedOrders.length === 1 ? '' : 's'}`;
+  detailListEl.innerHTML = selectedOrders.length
+    ? selectedOrders.map(order => `
+      <div class="earnings-order-row">
+        <div class="earnings-order-copy">
+          <strong>${formatOrderId(order.id)} · ${order.customerName || 'Unknown'}</strong>
+          <span>${new Date(order.paidAt).toLocaleString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+          })} · ${order.orderType === 'takeaway' ? 'Takeaway' : 'Dine In'}</span>
+        </div>
+        <span class="earnings-order-total">${formatCurrency(order.total)}</span>
+      </div>
+    `).join('')
+    : `<div class="earnings-empty"><i class="fas fa-calendar-day"></i><p>No paid orders for ${formatDayLabel(selectedDay)} yet.</p></div>`;
+
+  const rows = [...paidByDay.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([dateKey, data]) => `
+      <button type="button" class="earnings-day-row ${dateKey === selectedDay ? 'active' : ''}" data-earnings-day="${dateKey}">
+        <span class="earnings-day-copy">
+          <strong>${formatDayLabel(dateKey)}</strong>
+          <span>${data.count} paid order${data.count === 1 ? '' : 's'}</span>
+        </span>
+        <span class="earnings-day-total">${formatCurrency(data.total)}</span>
+      </button>
+    `);
+
+  earningsList.innerHTML = rows.length
+    ? rows.join('')
+    : `<div class="earnings-empty"><i class="fas fa-wallet"></i><p>No paid orders yet. Mark delivered orders as paid to add them to earnings.</p></div>`;
 }
 
 // Status filters
@@ -197,6 +345,20 @@ function renderOrders() {
 
     const nextStatus = STATUS_FLOW[order.status];
     const canAdvance = !!nextStatus;
+    const canMarkPaid = order.status === 'delivered' && !order.isPaid;
+    const paymentStatus = order.isPaid
+      ? `<span class="order-payment paid"><i class="fas fa-wallet"></i> Paid</span>`
+      : order.status === 'delivered'
+        ? `<span class="order-payment unpaid"><i class="fas fa-hourglass-half"></i> Awaiting Payment</span>`
+        : '';
+    const paidAtMarkup = order.isPaid && order.paidAt
+      ? `<p class="order-payment-note"><i class="fas fa-badge-check"></i> Paid on ${new Date(order.paidAt).toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}</p>`
+      : '';
 
     return `
       <div class="order-card">
@@ -204,6 +366,7 @@ function renderOrders() {
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <span class="order-id">${formatOrderId(order.id)}</span>
             <span class="order-status ${order.status}">${order.status}</span>
+            ${paymentStatus}
             ${order.placedBy === 'admin' ? '<span style="font-size:0.7rem;color:var(--neon-cyan);border:1px solid var(--neon-cyan);padding:2px 8px;border-radius:12px;">Admin</span>' : ''}
           </div>
           <span class="order-time"><i class="far fa-clock"></i> ${time}</span>
@@ -215,13 +378,15 @@ function renderOrders() {
         </div>
         <div class="order-items-list">${itemTags}</div>
         ${order.notes ? `<p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:10px;"><i class="fas fa-note-sticky"></i> ${order.notes}</p>` : ''}
+        ${paidAtMarkup}
         <div class="order-card-bottom">
-          <span class="order-total">₹${(order.total || 0).toLocaleString()}</span>
+          <span class="order-total">${formatCurrency(order.total)}</span>
           <div class="order-actions">
             ${canAdvance ? `<button class="order-action-btn accept" onclick="updateOrderStatus('${order.id}', '${nextStatus}')"><i class="fas fa-arrow-right"></i> ${nextStatus}</button>` : ''}
+            ${canMarkPaid ? `<button class="order-action-btn pay" onclick="markOrderPaid('${order.id}')"><i class="fas fa-wallet"></i> Mark Paid</button>` : ''}
             ${order.status !== 'cancelled' && order.status !== 'delivered' ?
               `<button class="order-action-btn" onclick="updateOrderStatus('${order.id}', 'cancelled')"><i class="fas fa-times"></i> Cancel</button>` : ''}
-            ${order.status === 'delivered' || order.status === 'cancelled' ?
+            ${order.isPaid || order.status === 'cancelled' ?
               `<button class="order-action-btn" onclick="deleteOrder('${order.id}')"><i class="fas fa-trash"></i></button>` : ''}
           </div>
         </div>
@@ -244,6 +409,27 @@ async function updateOrderStatus(id, status) {
     }
   } catch (err) {
     showToast('Failed to update order', 'error');
+  }
+}
+
+async function markOrderPaid(id) {
+  try {
+    const res = await fetch(`/api/orders/${id}/payment`, {
+      method: 'PATCH',
+      headers: authHeaders()
+    });
+
+    if (res.ok) {
+      const order = await res.json();
+      showToast(`Order ${formatOrderId(order.id)} marked paid and added to earnings`, 'success');
+      fetchOrders();
+      return;
+    }
+
+    const error = await res.json().catch(() => ({}));
+    showToast(error.error || 'Failed to update payment', 'error');
+  } catch (err) {
+    showToast('Failed to update payment', 'error');
   }
 }
 

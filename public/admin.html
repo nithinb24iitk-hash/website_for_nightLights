@@ -86,11 +86,67 @@
         </div>
         <div class="stat-card glass-premium">
           <div class="stat-card-header">
-            <div><div class="stat-value" id="statRevenue">₹0</div><div class="stat-label">Revenue</div></div>
+            <div><div class="stat-value" id="statAwaitingPayment">0</div><div class="stat-label">Awaiting Payment</div></div>
+            <div class="stat-icon orange"><i class="fas fa-wallet"></i></div>
+          </div>
+        </div>
+        <div class="stat-card glass-premium">
+          <div class="stat-card-header">
+            <div><div class="stat-value" id="statPaidRevenue">₹0</div><div class="stat-label">Paid Revenue</div></div>
             <div class="stat-icon orange"><i class="fas fa-indian-rupee-sign"></i></div>
           </div>
         </div>
+        <div class="stat-card glass-premium">
+          <div class="stat-card-header">
+            <div><div class="stat-value" id="statTodayEarnings">₹0</div><div class="stat-label">Today's Earnings</div></div>
+            <div class="stat-icon yellow"><i class="fas fa-calendar-day"></i></div>
+          </div>
+        </div>
       </div>
+
+      <section class="earnings-section glass-premium">
+        <div class="earnings-section-head">
+          <div>
+            <div class="section-label"><i class="fas fa-circle"></i> Earnings</div>
+            <h3>Daily Earnings Tracker</h3>
+            <p>Revenue is counted only after a delivered order is marked paid.</p>
+          </div>
+          <label class="earnings-date-control" for="earningsDate">
+            <span>View Day</span>
+            <input type="date" id="earningsDate">
+          </label>
+        </div>
+
+        <div class="earnings-feature-grid">
+          <div class="earnings-feature-card">
+            <span class="earnings-feature-label">Selected Day</span>
+            <strong id="selectedDayEarnings">₹0</strong>
+            <span id="selectedDayMeta">0 paid orders</span>
+          </div>
+          <div class="earnings-feature-card secondary">
+            <span class="earnings-feature-label">Pending Collection</span>
+            <strong id="pendingCollectionValue">₹0</strong>
+            <span id="pendingCollectionMeta">0 delivered unpaid orders</span>
+          </div>
+        </div>
+
+        <div class="earnings-detail-card">
+          <div class="earnings-detail-head">
+            <div>
+              <span class="earnings-feature-label">Paid Orders</span>
+              <h4 id="earningsDetailTitle">Paid orders for today</h4>
+            </div>
+            <span id="earningsDetailCount">0 orders</span>
+          </div>
+          <div class="earnings-detail-list" id="earningsDetailList">
+            <div class="earnings-empty">No paid orders for this day.</div>
+          </div>
+        </div>
+
+        <div class="earnings-list" id="earningsList">
+          <div class="earnings-empty">No paid orders yet.</div>
+        </div>
+      </section>
 
       <!-- Orders -->
       <div class="orders-section">

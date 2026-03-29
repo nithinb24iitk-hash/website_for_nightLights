@@ -98,39 +98,145 @@
   <div class="modal-overlay" id="checkoutModal">
     <div class="modal checkout-modal">
       <div class="checkout-modal-head">
-        <h3><i class="fas fa-receipt"></i> Final Checkout</h3>
-        <p>Review your order, adjust quantities if needed, then confirm your details.</p>
+        <div>
+          <span class="checkout-kicker">Final Step</span>
+          <h3><i class="fas fa-receipt"></i> Final Checkout</h3>
+          <p>Review your bag, choose how you want to receive it, and we’ll start preparing right away.</p>
+        </div>
+        <div class="checkout-head-actions">
+          <div class="checkout-steps" aria-hidden="true">
+            <span class="checkout-step active">Review</span>
+            <span class="checkout-step active">Details</span>
+            <span class="checkout-step active">Confirm</span>
+          </div>
+          <button type="button" class="checkout-close" id="checkoutClose" aria-label="Close checkout">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
       </div>
 
-      <div id="checkoutSummary" class="checkout-review-panel">
-        <div class="checkout-summary-empty">Add items to see your order summary.</div>
-      </div>
+      <div class="checkout-layout">
+        <section class="checkout-pane checkout-pane-summary glass-premium">
+          <div class="checkout-pane-head">
+            <div>
+              <span class="checkout-pane-label">Your Order</span>
+              <h4>Everything in the bag</h4>
+            </div>
+            <span class="checkout-eta"><i class="fas fa-bolt"></i> Ready in 15-20 min</span>
+          </div>
 
-      <form id="orderForm" class="checkout-form">
-        <div class="form-group">
-          <label for="customerName">Your Name *</label>
-          <input type="text" id="customerName" required placeholder="Enter your name">
-        </div>
-        <div class="form-group">
-          <label for="customerPhone">Phone Number *</label>
-          <input type="tel" id="customerPhone" required placeholder="Enter your phone number">
-        </div>
-        <div class="form-group">
-          <label for="orderType">Order Type</label>
-          <select id="orderType">
-            <option value="dine-in">Dine In</option>
-            <option value="takeaway">Takeaway</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="orderNotes">Special Notes</label>
-          <textarea id="orderNotes" placeholder="Any special requests..."></textarea>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-ghost" id="cancelCheckout">Cancel</button>
-          <button type="submit" class="btn btn-primary">Confirm Order</button>
-        </div>
-      </form>
+          <div class="checkout-mini-stats">
+            <div class="checkout-stat-pill">
+              <span>Items</span>
+              <strong id="checkoutStatItems">0</strong>
+            </div>
+            <div class="checkout-stat-pill">
+              <span>Mode</span>
+              <strong id="checkoutStatMode">Dine In</strong>
+            </div>
+            <div class="checkout-stat-pill">
+              <span>Payment</span>
+              <strong id="checkoutStatPayment">At Cafe</strong>
+            </div>
+          </div>
+
+          <div id="checkoutSummary" class="checkout-review-panel">
+            <div class="checkout-summary-empty">Add items to see your order summary.</div>
+          </div>
+
+          <div class="checkout-benefits">
+            <div class="checkout-benefit">
+              <i class="fas fa-fire"></i>
+              <div>
+                <strong>Freshly prepared</strong>
+                <span>We start cooking once you confirm the order.</span>
+              </div>
+            </div>
+            <div class="checkout-benefit">
+              <i class="fas fa-bag-shopping"></i>
+              <div>
+                <strong>Easy pickup flow</strong>
+                <span>Choose dine-in or takeaway before you place it.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <form id="orderForm" class="checkout-form checkout-pane checkout-pane-form">
+          <div class="checkout-form-card">
+            <div class="checkout-form-head">
+              <span class="checkout-pane-label">Customer Details</span>
+              <h4>Who should we prepare this for?</h4>
+            </div>
+
+            <div class="checkout-form-grid">
+              <div class="form-group">
+                <label for="customerName">Your Name *</label>
+                <input type="text" id="customerName" required placeholder="Enter your name">
+              </div>
+              <div class="form-group">
+                <label for="customerPhone">Phone Number *</label>
+                <input type="tel" id="customerPhone" required inputmode="numeric" maxlength="15" placeholder="Enter your phone number">
+              </div>
+            </div>
+          </div>
+
+          <div class="checkout-form-card">
+            <div class="checkout-form-head">
+              <span class="checkout-pane-label">Order Type</span>
+              <h4>How would you like to receive it?</h4>
+            </div>
+
+            <div class="checkout-type-grid">
+              <label class="checkout-type-option">
+                <input type="radio" name="orderType" value="dine-in" checked>
+                <span class="checkout-type-card">
+                  <i class="fas fa-utensils"></i>
+                  <span class="checkout-type-copy">
+                    <strong>Dine In</strong>
+                    <small>Fresh from the kitchen at your table.</small>
+                  </span>
+                </span>
+              </label>
+
+              <label class="checkout-type-option">
+                <input type="radio" name="orderType" value="takeaway">
+                <span class="checkout-type-card">
+                  <i class="fas fa-bag-shopping"></i>
+                  <span class="checkout-type-copy">
+                    <strong>Takeaway</strong>
+                    <small>We’ll pack it up for quick pickup.</small>
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="checkout-form-card">
+            <div class="checkout-form-head">
+              <span class="checkout-pane-label">Notes</span>
+              <h4>Anything we should know?</h4>
+            </div>
+
+            <div class="form-group">
+              <label for="orderNotes">Special Notes</label>
+              <textarea id="orderNotes" placeholder="Add any special requests, pickup instructions, or preferences..."></textarea>
+            </div>
+          </div>
+
+          <div class="checkout-actions-bar">
+            <div class="checkout-actions-copy">
+              <span class="checkout-pane-label">Final Total</span>
+              <strong id="checkoutActionTotal">₹0</strong>
+              <span class="checkout-actions-note" id="checkoutActionNote">Payment is collected at the cafe after handoff.</span>
+            </div>
+            <div class="form-actions checkout-actions">
+              <button type="button" class="btn btn-ghost" id="cancelCheckout">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="confirmCheckoutBtn">Place Order</button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
