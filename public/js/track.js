@@ -160,6 +160,21 @@ function formatDateTime(value) {
   });
 }
 
+function scrollSelectedOrderIntoView() {
+  if (!window.matchMedia('(max-width: 768px)').matches) return;
+
+  const stateCard = document.getElementById('trackingStateCard');
+  if (!stateCard || stateCard.hidden) return;
+
+  requestAnimationFrame(() => {
+    const targetTop = stateCard.getBoundingClientRect().top + window.scrollY - 84;
+    window.scrollTo({
+      top: Math.max(targetTop, 0),
+      behavior: 'smooth'
+    });
+  });
+}
+
 function seedLookupFormFromStorage() {
   const sessionOrderId = readSessionActiveOrderId();
   if (!sessionOrderId) return;
@@ -289,6 +304,7 @@ async function bootstrapTracking() {
       const existing = trackedOrders.get(requestedOrderId) || await fetchOrderById(requestedOrderId);
       mergeTrackedOrders([existing], requestedOrderId);
       selectOrder(requestedOrderId, { updateUrl: false });
+      scrollSelectedOrderIntoView();
       return;
     } catch (err) {
       showToast(err.message || 'Order not found', 'error');
@@ -360,6 +376,7 @@ function setupLookupForm() {
         mergeTrackedOrders([order], order.id);
         renderDeviceRecentList();
         selectOrder(order.id);
+        scrollSelectedOrderIntoView();
         showToast(`Loaded order ${order.id}`, 'success');
       } catch (err) {
         showToast(err.message || 'Order not found', 'error');
@@ -389,6 +406,7 @@ async function handlePhoneLookup(phone, options = {}) {
 
     if (autoSelect && orders[0]) {
       selectOrder(orders[0].id);
+      scrollSelectedOrderIntoView();
     } else if (!orders.length && !quiet) {
       showToast('No orders found for that phone number', 'error');
     }
@@ -454,12 +472,18 @@ function renderSelectedOrder(order) {
   const addMoreTop = document.getElementById('trackingAddMoreTop');
   const addMoreBtn = document.getElementById('trackingAddMoreBtn');
   const clearBtn = document.getElementById('trackingClearBtn');
+  const snapshotEl = document.getElementById('trackingSnapshot');
+
+  document.body.classList.toggle('has-tracked-order', Boolean(order));
 
   if (!order) {
     stateCard.hidden = true;
     emptyState.hidden = false;
     addMoreTop.href = '/order';
     addMoreBtn.href = '/order';
+    if (snapshotEl) {
+      snapshotEl.innerHTML = '';
+    }
     writeSessionActiveOrderId('');
     return;
   }
@@ -485,6 +509,23 @@ function renderSelectedOrder(order) {
   document.getElementById('trackingStatusBadge').textContent = getDisplayStatus(order);
   document.getElementById('trackingStatusBadge').className = `tracking-status-badge ${stage}`;
   document.getElementById('trackingItemCount').textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+
+  if (snapshotEl) {
+    snapshotEl.innerHTML = `
+      <div class="tracking-snapshot-card">
+        <span>Items</span>
+        <strong>${itemCount}</strong>
+      </div>
+      <div class="tracking-snapshot-card">
+        <span>Mode</span>
+        <strong>${order.orderType === 'takeaway' ? 'Takeaway' : 'Dine In'}</strong>
+      </div>
+      <div class="tracking-snapshot-card">
+        <span>Total</span>
+        <strong>${formatCurrency(order.total)}</strong>
+      </div>
+    `;
+  }
 
   renderTrackingProgress(order);
 
@@ -578,7 +619,10 @@ function renderDeviceRecentList() {
 
   listEl.innerHTML = items.map(order => renderTrackingListButton(order)).join('');
   listEl.querySelectorAll('[data-order-id]').forEach(button => {
-    button.addEventListener('click', () => selectOrder(button.dataset.orderId));
+    button.addEventListener('click', () => {
+      selectOrder(button.dataset.orderId);
+      scrollSelectedOrderIntoView();
+    });
   });
 }
 
@@ -599,7 +643,10 @@ function renderPhoneResultsList(orders, phone, preserveExisting = false) {
   metaEl.textContent = `Showing the latest ${orders.length} order${orders.length === 1 ? '' : 's'} for ${phone}.`;
   listEl.innerHTML = orders.map(order => renderTrackingListButton(order)).join('');
   listEl.querySelectorAll('[data-order-id]').forEach(button => {
-    button.addEventListener('click', () => selectOrder(button.dataset.orderId));
+    button.addEventListener('click', () => {
+      selectOrder(button.dataset.orderId);
+      scrollSelectedOrderIntoView();
+    });
   });
 }
 

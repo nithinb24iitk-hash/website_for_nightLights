@@ -2425,6 +2425,7 @@ section {
 .tracking-page {
   padding: 110px 0 72px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .tracking-hero,
@@ -2466,6 +2467,7 @@ section {
 .tracking-sidebar {
   display: grid;
   gap: 20px;
+  min-width: 0;
 }
 
 .tracking-card-head {
@@ -2474,6 +2476,10 @@ section {
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 20px;
+}
+
+.tracking-card-head > div {
+  min-width: 0;
 }
 
 .tracking-kicker {
@@ -2499,6 +2505,37 @@ section {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+}
+
+.tracking-snapshot {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.tracking-snapshot-card {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tracking-snapshot-card span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.tracking-snapshot-card strong {
+  display: block;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .tracking-head-meta .order-id {
@@ -2742,6 +2779,7 @@ section {
 .tracking-summary-copy strong {
   display: block;
   font-size: 0.94rem;
+  overflow-wrap: anywhere;
 }
 
 .tracking-summary-copy span {
@@ -2785,6 +2823,7 @@ section {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .tracking-list-copy strong,
@@ -2955,19 +2994,46 @@ section {
   }
 
   .tracking-page {
-    padding-top: 100px;
+    padding-top: 92px;
   }
 
   .tracking-hero,
   .tracking-card {
-    padding: 20px;
+    padding: 18px;
+  }
+
+  .tracking-hero {
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  body.has-tracked-order .tracking-hero {
+    padding: 16px 18px;
+  }
+
+  body.has-tracked-order .tracking-hero-actions {
+    display: none;
+  }
+
+  .tracking-card-head {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .tracking-card-head h3 {
+    font-size: 1.16rem;
+  }
+
+  .tracking-card-head p {
+    font-size: 0.92rem;
   }
 
   .tracking-progress {
     display: flex;
     overflow-x: auto;
-    padding: 0 4px 8px;
-    margin: 0 -4px 20px;
+    padding: 0 2px 6px;
+    margin: 0 -2px 16px;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
   }
@@ -2977,42 +3043,88 @@ section {
   }
 
   .tracking-step {
-    min-width: 118px;
+    min-width: 102px;
     scroll-snap-align: start;
-    flex: 0 0 118px;
+    flex: 0 0 102px;
+    padding: 12px 10px;
+  }
+
+  .tracking-step-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .tracking-step-copy strong {
+    font-size: 0.84rem;
   }
 
   .tracking-head-meta {
     width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    gap: 8px;
+    justify-items: flex-start;
   }
 
   .tracking-head-meta .order-id {
+    width: 100%;
     text-align: left;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .tracking-status-badge {
-    flex-shrink: 0;
+    max-width: 100%;
+  }
+
+  .tracking-snapshot {
+    margin-bottom: 16px;
+  }
+
+  .tracking-snapshot-card {
+    padding: 12px 10px;
+  }
+
+  .tracking-snapshot-card strong {
+    font-size: 0.92rem;
+  }
+
+  .tracking-summary-head,
+  .tracking-side-head {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .tracking-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tracking-list-meta {
-    width: 100%;
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
+    width: auto;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 6px;
   }
 
   .tracking-summary-row {
-    align-items: flex-start;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
   }
 
   .tracking-summary-total {
-    align-self: flex-end;
+    align-self: start;
+  }
+
+  .tracking-list-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    padding: 12px 14px;
   }
 
   .tracking-hero-actions,
@@ -3025,6 +3137,11 @@ section {
   .tracking-actions .btn,
   .tracking-lookup-actions .btn {
     flex: 1 1 100%;
+  }
+
+  .tracking-empty {
+    min-height: 220px;
+    padding: 24px 18px;
   }
 }
 
@@ -3041,6 +3158,38 @@ section {
 
   .mcb-title {
     font-size: 0.92rem;
+  }
+
+  .tracking-hero,
+  .tracking-card {
+    padding: 16px;
+  }
+
+  .tracking-snapshot {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracking-snapshot-card:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .tracking-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-list-item,
+  .tracking-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-list-meta,
+  .tracking-summary-total {
+    align-items: flex-start;
+  }
+
+  .tracking-side-head,
+  .tracking-summary-head {
+    gap: 8px;
   }
 
   .mcb-total {
