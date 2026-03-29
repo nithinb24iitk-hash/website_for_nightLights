@@ -3,6 +3,7 @@
 // ==========================================
 
 const TRACKING_STORAGE_KEY = 'frydayTrackingState';
+const TRACKING_SESSION_KEY = 'frydayActiveTrackingOrderId';
 const trackedOrders = new Map();
 let trackingPollerId = null;
 
@@ -104,6 +105,19 @@ function writeTrackingState(state) {
   }));
 }
 
+function readSessionActiveOrderId() {
+  return String(sessionStorage.getItem(TRACKING_SESSION_KEY) || '');
+}
+
+function writeSessionActiveOrderId(orderId) {
+  const normalizedId = String(orderId || '').trim();
+  if (normalizedId) {
+    sessionStorage.setItem(TRACKING_SESSION_KEY, normalizedId);
+  } else {
+    sessionStorage.removeItem(TRACKING_SESSION_KEY);
+  }
+}
+
 function normalizePhone(value = '') {
   return String(value || '').replace(/\D/g, '').slice(-15);
 }
@@ -147,6 +161,9 @@ function formatDateTime(value) {
 }
 
 function seedLookupFormFromStorage() {
+  const sessionOrderId = readSessionActiveOrderId();
+  if (!sessionOrderId) return;
+
   const state = readTrackingState();
   const phoneInput = document.getElementById('lookupPhone');
   if (phoneInput && state.customerPhone) {
@@ -202,6 +219,9 @@ function removeTrackedOrderFromDevice(orderId) {
   }
   writeTrackingState(state);
   trackedOrders.delete(orderId);
+  if (readSessionActiveOrderId() === orderId) {
+    writeSessionActiveOrderId('');
+  }
 }
 
 async function fetchOrderById(orderId) {
@@ -244,6 +264,7 @@ async function bootstrapTracking() {
   const params = new URLSearchParams(window.location.search);
   const requestedOrderId = normalizeOrderId(params.get('orderId'));
   const requestedPhone = normalizePhone(params.get('phone'));
+  const sessionOrderId = readSessionActiveOrderId();
   const state = readTrackingState();
   let recentDeviceOrders = [];
 
@@ -275,10 +296,17 @@ async function bootstrapTracking() {
   }
 
   const latestState = readTrackingState();
-  const fallbackId = latestState.selectedOrderId || latestState.activeOrderIds[0] || latestState.recentOrders[0]?.id || '';
+  const fallbackId = sessionOrderId || (requestedPhone ? latestState.selectedOrderId : '');
   if (fallbackId && trackedOrders.has(fallbackId)) {
     selectOrder(fallbackId, { updateUrl: false });
   } else {
+    if (!requestedOrderId && !requestedPhone && latestState.selectedOrderId && !sessionOrderId) {
+      latestState.selectedOrderId = '';
+      writeTrackingState(latestState);
+    }
+    if (sessionOrderId && !latestState.activeOrderIds.includes(sessionOrderId)) {
+      writeSessionActiveOrderId('');
+    }
     renderSelectedOrder(null);
   }
 }
@@ -296,9 +324,12 @@ async function refreshTrackedOrders() {
     const selectedId = readTrackingState().selectedOrderId;
     if (selectedId && trackedOrders.has(selectedId)) {
       renderSelectedOrder(trackedOrders.get(selectedId));
-    } else if (orders[0]) {
-      selectOrder(orders[0].id, { updateUrl: false });
     } else {
+      const sessionOrderId = readSessionActiveOrderId();
+      if (sessionOrderId && trackedOrders.has(sessionOrderId)) {
+        selectOrder(sessionOrderId, { updateUrl: false });
+        return;
+      }
       renderSelectedOrder(null);
     }
   } catch (err) {
@@ -341,7 +372,7 @@ function setupLookupForm() {
 
   resetBtn?.addEventListener('click', () => {
     document.getElementById('lookupOrderId').value = '';
-    document.getElementById('lookupPhone').value = readTrackingState().customerPhone || '';
+    document.getElementById('lookupPhone').value = readSessionActiveOrderId() ? readTrackingState().customerPhone || '' : '';
     document.getElementById('phoneResultsCard').hidden = true;
     document.getElementById('phoneResultsList').innerHTML = '';
   });
@@ -428,6 +459,8 @@ function renderSelectedOrder(order) {
     stateCard.hidden = true;
     emptyState.hidden = false;
     addMoreTop.href = '/order';
+    addMoreBtn.href = '/order';
+    writeSessionActiveOrderId('');
     return;
   }
 
@@ -487,11 +520,18 @@ function renderSelectedOrder(order) {
     </div>
   `).join('') || '<div class="tracking-list-empty">No items found for this order.</div>';
 
-  addMoreTop.href = order.isPaid || order.status === 'cancelled' ? '/order' : '/order?addMore=1';
+  const isActiveOrder = isOrderActive(order);
+  if (isActiveOrder) {
+    writeSessionActiveOrderId(order.id);
+  } else if (readSessionActiveOrderId() === order.id) {
+    writeSessionActiveOrderId('');
+  }
+
+  addMoreTop.href = isActiveOrder ? '/order?addMore=1' : '/order';
   addMoreBtn.href = addMoreTop.href;
-  addMoreBtn.innerHTML = order.isPaid || order.status === 'cancelled'
-    ? '<i class="fas fa-utensils"></i> Start New Order'
-    : '<i class="fas fa-plus"></i> Add More Items';
+  addMoreBtn.innerHTML = isActiveOrder
+    ? '<i class="fas fa-plus"></i> Add More Items'
+    : '<i class="fas fa-utensils"></i> Start New Order';
   clearBtn.textContent = order.isPaid || order.status === 'cancelled' ? 'Remove from Recent' : 'Hide This Order';
 }
 

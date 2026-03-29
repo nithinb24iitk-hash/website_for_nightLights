@@ -6,6 +6,7 @@ let dynamicMenu = [];
 
 let cart = [];
 const TRACKING_STORAGE_KEY = 'frydayTrackingState';
+const TRACKING_SESSION_KEY = 'frydayActiveTrackingOrderId';
 
 function readTrackingState() {
   try {
@@ -38,6 +39,19 @@ function writeTrackingState(state) {
   }));
 }
 
+function readSessionActiveOrderId() {
+  return String(sessionStorage.getItem(TRACKING_SESSION_KEY) || '');
+}
+
+function writeSessionActiveOrderId(orderId) {
+  const normalizedId = String(orderId || '').trim();
+  if (normalizedId) {
+    sessionStorage.setItem(TRACKING_SESSION_KEY, normalizedId);
+  } else {
+    sessionStorage.removeItem(TRACKING_SESSION_KEY);
+  }
+}
+
 function rememberTrackedOrder(order) {
   const state = readTrackingState();
   const recentEntry = {
@@ -63,6 +77,7 @@ function rememberTrackedOrder(order) {
   state.customerPhone = order.customerPhone || state.customerPhone;
   state.customerName = order.customerName || state.customerName;
   writeTrackingState(state);
+  writeSessionActiveOrderId(order.id);
 }
 
 function getAddMoreMode() {
@@ -118,20 +133,25 @@ async function refreshTrackingStateFromServer() {
 
 async function handleActiveOrderRouting() {
   const state = await refreshTrackingStateFromServer();
-  const hasActiveOrder = state.activeOrderIds.length > 0;
+  const sessionOrderId = readSessionActiveOrderId();
+  const hasSessionActiveOrder = Boolean(sessionOrderId) && state.activeOrderIds.includes(sessionOrderId);
   const addMoreMode = getAddMoreMode();
 
-  if (hasActiveOrder && !addMoreMode) {
-    window.location.replace('/track');
+  if (!hasSessionActiveOrder) {
+    writeSessionActiveOrderId('');
+  }
+
+  if (hasSessionActiveOrder && !addMoreMode) {
+    window.location.replace(`/track?orderId=${encodeURIComponent(sessionOrderId)}`);
     return true;
   }
 
   const banner = document.getElementById('activeOrderBanner');
   if (banner) {
-    banner.hidden = !(hasActiveOrder && addMoreMode);
+    banner.hidden = !(hasSessionActiveOrder && addMoreMode);
   }
 
-  if (addMoreMode) {
+  if (addMoreMode && hasSessionActiveOrder) {
     const nameInput = document.getElementById('customerName');
     const phoneInput = document.getElementById('customerPhone');
     if (nameInput && state.customerName) {
@@ -140,6 +160,9 @@ async function handleActiveOrderRouting() {
     if (phoneInput && state.customerPhone) {
       phoneInput.value = state.customerPhone;
     }
+  } else if (addMoreMode && !hasSessionActiveOrder) {
+    const nextUrl = `${window.location.pathname}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', nextUrl);
   }
 
   return false;
