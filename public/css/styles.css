@@ -2406,6 +2406,10 @@ section {
   margin-bottom: 24px;
 }
 
+.active-order-banner[hidden] {
+  display: none !important;
+}
+
 .active-order-banner h3 {
   font-size: 1.15rem;
   margin: 8px 0 6px;
@@ -2761,6 +2765,36 @@ section {
 .tracking-lookup-form {
   display: grid;
   gap: 12px;
+}
+
+.tracking-lookup-form .form-group {
+  margin-bottom: 0;
+}
+
+.tracking-lookup-divider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tracking-lookup-divider::before,
+.tracking-lookup-divider::after {
+  content: '';
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.14));
+}
+
+.tracking-lookup-divider::after {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02));
+}
+
+.tracking-lookup-divider span {
+  padding: 0 2px;
 }
 
 .tracking-summary-row {
