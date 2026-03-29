@@ -53,12 +53,8 @@
           <div class="order-menu-grid" id="orderMenuGrid"></div>
         </div>
 
-        <!-- Cart Sidebar -->
+        <!-- Cart Sidebar (Desktop only now) -->
         <aside class="cart-sidebar glass-premium" id="cartSidebar">
-          <div class="cart-toggle" id="cartToggle">
-            <h3><i class="fas fa-shopping-cart"></i> Your Cart <span class="cart-count" id="cartCountMobile">0</span></h3>
-            <i class="fas fa-chevron-up"></i>
-          </div>
           <div class="cart-header">
             <h3><i class="fas fa-shopping-cart"></i> Your Cart <span class="cart-count" id="cartCount">0</span></h3>
             <button class="btn-ghost" id="clearCartBtn" style="font-size:0.8rem;padding:4px 12px;">Clear</button>
@@ -75,7 +71,7 @@
               <span class="total-price" id="cartTotal">₹0</span>
             </div>
             <button class="checkout-btn" id="checkoutBtn">
-              <i class="fas fa-check-circle"></i> Place Order
+              <i class="fas fa-check-circle"></i> Proceed to Checkout
             </button>
           </div>
         </aside>
@@ -83,11 +79,34 @@
     </div>
   </main>
 
+  <!-- Mobile Sticky Cart Bar -->
+  <button type="button" class="mobile-cart-bar glass-premium" id="mobileCartBar" hidden aria-label="Proceed to checkout">
+    <span class="mcb-left">
+      <span class="mcb-icon"><i class="fas fa-shopping-bag"></i></span>
+      <span class="mcb-copy">
+        <span class="mcb-title">Proceed to Checkout</span>
+        <span class="mcb-meta" id="mcbCount">0 items</span>
+      </span>
+    </span>
+    <span class="mcb-right">
+      <span class="mcb-total" id="mcbTotal">₹0</span>
+      <span class="mcb-action">Review <i class="fas fa-arrow-right"></i></span>
+    </span>
+  </button>
+
   <!-- CHECKOUT MODAL -->
   <div class="modal-overlay" id="checkoutModal">
-    <div class="modal">
-      <h3><i class="fas fa-receipt"></i> Confirm Your Order</h3>
-      <form id="orderForm">
+    <div class="modal checkout-modal">
+      <div class="checkout-modal-head">
+        <h3><i class="fas fa-receipt"></i> Final Checkout</h3>
+        <p>Review your order, adjust quantities if needed, then confirm your details.</p>
+      </div>
+
+      <div id="checkoutSummary" class="checkout-review-panel">
+        <div class="checkout-summary-empty">Add items to see your order summary.</div>
+      </div>
+
+      <form id="orderForm" class="checkout-form">
         <div class="form-group">
           <label for="customerName">Your Name *</label>
           <input type="text" id="customerName" required placeholder="Enter your name">

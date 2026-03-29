@@ -24,8 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderMenu('all');
   setupFilters();
-  setupCartToggle();
   setupCheckout();
+  renderCart();
 });
 
 // Render menu items
@@ -65,17 +65,6 @@ function setupFilters() {
   });
 }
 
-// Cart toggle (mobile)
-function setupCartToggle() {
-  const toggle = document.getElementById('cartToggle');
-  const sidebar = document.getElementById('cartSidebar');
-  if (toggle) {
-    toggle.addEventListener('click', () => {
-      sidebar.classList.toggle('expanded');
-    });
-  }
-}
-
 // Add to cart
 function addToCart(id) {
   const item = dynamicMenu.find(i => i.id === id);
@@ -111,23 +100,26 @@ function renderCart() {
   const container = document.getElementById('cartItems');
   const summary = document.getElementById('cartSummary');
   const countEl = document.getElementById('cartCount');
-  const countMobileEl = document.getElementById('cartCountMobile');
   const totalEl = document.getElementById('cartTotal');
+  const checkoutBtn = document.getElementById('checkoutBtn');
 
   const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
   const totalPrice = cart.reduce((sum, c) => sum + c.price * c.qty, 0);
 
   countEl.textContent = totalItems;
-  if (countMobileEl) countMobileEl.textContent = totalItems;
 
   if (cart.length === 0) {
     container.innerHTML = `<div class="cart-empty"><i class="fas fa-shopping-basket"></i><p>Your cart is empty</p></div>`;
     summary.style.display = 'none';
+    checkoutBtn.disabled = true;
+    renderMobileCartBar(totalItems, totalPrice);
+    renderCheckoutSummary(totalItems, totalPrice);
     return;
   }
 
   summary.style.display = 'block';
   totalEl.textContent = `₹${totalPrice}`;
+  checkoutBtn.disabled = false;
 
   container.innerHTML = cart.map(item => `
     <div class="cart-item">
@@ -143,36 +135,123 @@ function renderCart() {
       </div>
     </div>
   `).join('');
+
+  renderMobileCartBar(totalItems, totalPrice);
+  renderCheckoutSummary(totalItems, totalPrice);
+}
+
+function renderMobileCartBar(totalItems, totalPrice) {
+  const mobileBar = document.getElementById('mobileCartBar');
+  const countEl = document.getElementById('mcbCount');
+  const totalEl = document.getElementById('mcbTotal');
+
+  if (!mobileBar || !countEl || !totalEl) return;
+
+  const itemLabel = `${totalItems} ${totalItems === 1 ? 'item' : 'items'}`;
+  countEl.textContent = itemLabel;
+  totalEl.textContent = `₹${totalPrice}`;
+  mobileBar.hidden = totalItems === 0;
+}
+
+function renderCheckoutSummary(totalItems, totalPrice) {
+  const summaryEl = document.getElementById('checkoutSummary');
+  const submitBtn = document.querySelector('#orderForm button[type="submit"]');
+
+  if (!summaryEl || !submitBtn) return;
+
+  if (cart.length === 0) {
+    summaryEl.innerHTML = `
+      <div class="checkout-summary-empty">
+        <i class="fas fa-bag-shopping"></i>
+        <p>Your cart is empty. Add a few late-night favorites to continue.</p>
+      </div>
+    `;
+    submitBtn.disabled = true;
+    return;
+  }
+
+  submitBtn.disabled = false;
+
+  summaryEl.innerHTML = `
+    <div class="checkout-summary-head">
+      <div>
+        <span class="checkout-summary-label">Order Overview</span>
+        <h4>${totalItems} ${totalItems === 1 ? 'item' : 'items'} selected</h4>
+      </div>
+      <button type="button" class="btn-ghost review-clear-btn" onclick="clearCart()" aria-label="Clear cart">
+        Clear cart
+      </button>
+    </div>
+    <div class="checkout-summary-items">
+      ${cart.map(item => `
+        <div class="review-item">
+          <div class="review-item-copy">
+            <strong>${item.name}</strong>
+            <span>₹${item.price} each</span>
+          </div>
+          <div class="review-item-actions">
+            <div class="review-qty">
+              <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)" aria-label="Decrease ${item.name} quantity">−</button>
+              <span class="qty-number">${item.qty}</span>
+              <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)" aria-label="Increase ${item.name} quantity">+</button>
+            </div>
+            <span class="review-line-total">₹${item.price * item.qty}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="review-total">
+      <span>Total</span>
+      <span>₹${totalPrice}</span>
+    </div>
+  `;
+}
+
+function clearCart() {
+  cart = [];
+  renderCart();
 }
 
 // Clear cart
-document.getElementById('clearCartBtn').addEventListener('click', () => {
-  cart = [];
-  renderCart();
-});
+document.getElementById('clearCartBtn').addEventListener('click', clearCart);
 
 // Checkout
 function setupCheckout() {
   const modal = document.getElementById('checkoutModal');
   const checkoutBtn = document.getElementById('checkoutBtn');
+  const mobileCheckoutBtn = document.getElementById('mobileCartBar');
   const cancelBtn = document.getElementById('cancelCheckout');
   const form = document.getElementById('orderForm');
 
-  checkoutBtn.addEventListener('click', () => {
+  const openCheckout = () => {
     if (cart.length === 0) return;
+    renderCheckoutSummary(
+      cart.reduce((sum, c) => sum + c.qty, 0),
+      cart.reduce((sum, c) => sum + c.price * c.qty, 0)
+    );
     modal.classList.add('active');
-  });
+  };
 
-  cancelBtn.addEventListener('click', () => {
+  const closeCheckout = () => {
     modal.classList.remove('active');
-  });
+  };
+
+  checkoutBtn.addEventListener('click', openCheckout);
+
+  if (mobileCheckoutBtn) {
+    mobileCheckoutBtn.addEventListener('click', openCheckout);
+  }
+
+  cancelBtn.addEventListener('click', closeCheckout);
 
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.remove('active');
+    if (e.target === modal) closeCheckout();
   });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    if (cart.length === 0) return;
 
     const orderData = {
       customerName: document.getElementById('customerName').value,
@@ -194,7 +273,7 @@ function setupCheckout() {
       if (res.ok) {
         cart = [];
         renderCart();
-        modal.classList.remove('active');
+        closeCheckout();
         form.reset();
         showToast('🎉 Order placed successfully! We\'ll prepare it right away.', 'success');
       } else {
