@@ -16,6 +16,14 @@ const STATUS_FLOW = {
   ready: 'delivered'
 };
 
+function formatOrderId(orderId) {
+  const value = String(orderId || '');
+  if (/^FDNL-\d{8}-\d+$/.test(value)) {
+    return value;
+  }
+  return `LEGACY-${value.slice(-6)}`;
+}
+
 // Helper: get auth headers
 function authHeaders() {
   return {
@@ -194,7 +202,7 @@ function renderOrders() {
       <div class="order-card">
         <div class="order-card-top">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <span class="order-id">#${order.id.slice(-6)}</span>
+            <span class="order-id">${formatOrderId(order.id)}</span>
             <span class="order-status ${order.status}">${order.status}</span>
             ${order.placedBy === 'admin' ? '<span style="font-size:0.7rem;color:var(--neon-cyan);border:1px solid var(--neon-cyan);padding:2px 8px;border-radius:12px;">Admin</span>' : ''}
           </div>
@@ -350,8 +358,9 @@ function setupAdminOrderModal() {
         body: JSON.stringify(orderData)
       });
       if (res.ok) {
+        const createdOrder = await res.json();
         modal.classList.remove('active');
-        showToast('Order created successfully!', 'success');
+        showToast(`Order ${formatOrderId(createdOrder.id)} created successfully!`, 'success');
         fetchOrders();
       }
     } catch (err) {

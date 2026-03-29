@@ -271,11 +271,12 @@ function setupCheckout() {
       });
 
       if (res.ok) {
+        const createdOrder = await res.json();
         cart = [];
         renderCart();
         closeCheckout();
         form.reset();
-        showToast('🎉 Order placed successfully! We\'ll prepare it right away.', 'success');
+        showToast(`🎉 Order ${createdOrder.id} placed successfully! We\'ll prepare it right away.`, 'success');
       } else {
         showToast('Failed to place order. Please try again.', 'error');
       }

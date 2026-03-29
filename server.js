@@ -32,6 +32,13 @@ const orderSchema = new mongoose.Schema({
 });
 const Order = mongoose.model('Order', orderSchema);
 
+// Counter Model
+const counterSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  seq: { type: Number, default: 0 }
+});
+const Counter = mongoose.model('Counter', counterSchema);
+
 // Menu Item Model
 const menuItemSchema = new mongoose.Schema({
   id: Number,
@@ -43,6 +50,32 @@ const menuItemSchema = new mongoose.Schema({
   isSoldOut: { type: Boolean, default: false }
 });
 const MenuItem = mongoose.model('MenuItem', menuItemSchema);
+
+function getOrderDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  const year = parts.find(part => part.type === 'year')?.value || '0000';
+  const month = parts.find(part => part.type === 'month')?.value || '00';
+  const day = parts.find(part => part.type === 'day')?.value || '00';
+
+  return `${year}${month}${day}`;
+}
+
+async function generateOrderId(now = new Date()) {
+  const dateKey = getOrderDateKey(now);
+  const counter = await Counter.findOneAndUpdate(
+    { key: `order:${dateKey}` },
+    { $inc: { seq: 1 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  return `FDNL-${dateKey}-${String(counter.seq).padStart(3, '0')}`;
+}
 
 // Seed Default Menu if Empty
 async function seedMenu() {
@@ -200,24 +233,30 @@ app.post('/api/orders', async (req, res) => {
   const customerPhone = escapeHtml(req.body.customerPhone || 'N/A');
   const orderType = escapeHtml(req.body.orderType || 'dine-in');
   const notes = escapeHtml(req.body.notes || '');
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const total = Number(req.body.total) || 0;
+  const placedBy = req.body.placedBy === 'admin' ? 'admin' : 'customer';
 
-  const newOrder = new Order({
-    id: Date.now().toString(),
-    ...req.body, // safe because it's only read by our controlled JS
-    customerName,
-    customerPhone,
-    orderType,
-    notes,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  });
-  
   // Cap items array size
-  if (newOrder.items && newOrder.items.length > 50) {
+  if (items.length > 50) {
      return res.status(400).json({ error: 'Too many items in order' });
   }
 
   try {
+    const now = new Date();
+    const newOrder = new Order({
+      id: await generateOrderId(now),
+      customerName,
+      customerPhone,
+      orderType,
+      notes,
+      status: 'pending',
+      items,
+      total,
+      placedBy,
+      createdAt: now.toISOString()
+    });
+
     await newOrder.save();
     res.status(201).json(newOrder);
   } catch (err) {
