@@ -212,13 +212,46 @@ app.post('/api/menu', requireAdmin, async (req, res) => {
       category: category,
       price: Number(req.body.price),
       desc: escapeHtml(req.body.desc || ''),
-      image: imageSrc
+      image: imageSrc,
+      isSoldOut: Boolean(req.body.isSoldOut)
     });
 
     await newItem.save();
     res.status(201).json(newItem);
   } catch (err) {
     res.status(500).json({ error: 'Failed to add menu item' });
+  }
+});
+
+// UPDATE menu item (admin only)
+app.patch('/api/menu/:id', requireAdmin, async (req, res) => {
+  try {
+    const item = await MenuItem.findOne({ id: Number(req.params.id) });
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const category = String(req.body.category || item.category || 'burgers').trim() || 'burgers';
+    let imageSrc = typeof req.body.image === 'string' ? req.body.image.trim() : item.image;
+
+    if (!imageSrc) {
+      imageSrc = `images/${category}.png`;
+      if (!['burgers', 'fries', 'pizza', 'milkshakes', 'desserts'].includes(category)) {
+        imageSrc = 'images/burger.png';
+      }
+    }
+
+    item.name = escapeHtml(req.body.name || item.name);
+    item.category = category;
+    item.price = Number(req.body.price) || item.price;
+    item.desc = escapeHtml(req.body.desc || '');
+    item.image = imageSrc;
+    if (typeof req.body.isSoldOut === 'boolean') {
+      item.isSoldOut = req.body.isSoldOut;
+    }
+
+    await item.save();
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update menu item' });
   }
 });
 

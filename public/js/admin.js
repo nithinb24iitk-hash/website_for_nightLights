@@ -83,15 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
     navLinks.classList.toggle('open');
   });
 
-  // Add Item Form Submit
-  const addForm = document.getElementById('addMenuItemForm');
-  if (addForm) {
-    addForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      await addMenuItem();
-    });
-  }
-
   // Setup login
   setupLogin();
 
@@ -568,98 +559,4 @@ function showToast(message, type = 'info') {
     toast.style.transition = '0.3s ease';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
-}
-
-// ==========================================
-// MENU MANAGER LOGIC
-// ==========================================
-function openMenuManager() {
-  document.getElementById('menuManagerModal').classList.add('active');
-  renderAdminMenuList();
-}
-
-function renderAdminMenuList() {
-  const list = document.getElementById('adminMenuList');
-  if (dynamicMenu.length === 0) {
-    list.innerHTML = '<p style="text-align:center; padding:10px;">Menu is empty.</p>';
-    return;
-  }
-  list.innerHTML = dynamicMenu.map(item => `
-    <div style="display: flex; justify-content: space-between; align-items:center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-      <span style="${item.isSoldOut ? 'text-decoration: line-through; opacity: 0.5;' : ''}"><strong>${item.name}</strong> (₹${item.price})</span>
-      <div>
-        <button onclick="toggleSoldOut(${item.id})" style="background:none; border:none; margin-right: 15px; color:${item.isSoldOut ? 'var(--neon-pink)' : '#aaa'}; cursor:pointer;" title="Toggle Sold Out">
-          <i class="fas ${item.isSoldOut ? 'fa-ban' : 'fa-check-circle'}"></i> 
-        </button>
-        <button onclick="deleteMenuItem(${item.id})" style="background:none; border:none; color:#ff4444; cursor:pointer;" title="Delete Item">
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
-    </div>
-  `).join('');
-}
-
-async function addMenuItem() {
-  const payload = {
-    name: document.getElementById('newMenuName').value,
-    category: document.getElementById('newMenuCategory').value,
-    price: document.getElementById('newMenuPrice').value,
-    desc: document.getElementById('newMenuDesc').value,
-    image: document.getElementById('newMenuImage').value
-  };
-
-  try {
-    const res = await fetch('/api/menu', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-token': sessionStorage.getItem('adminToken')
-      },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      showToast('Item added successfully!', 'success');
-      document.getElementById('addMenuItemForm').reset();
-      await fetchMenu();
-      renderAdminMenuList();
-    } else {
-      showToast('Failed to add item', 'error');
-    }
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-async function deleteMenuItem(id) {
-  if (!confirm('Are you sure you want to permanently delete this item?')) return;
-  try {
-    const res = await fetch(`/api/menu/${id}`, {
-      method: 'DELETE',
-      headers: { 'x-admin-token': sessionStorage.getItem('adminToken') }
-    });
-    if (res.ok) {
-      showToast('Item deleted!', 'success');
-      await fetchMenu();
-      renderAdminMenuList();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-async function toggleSoldOut(id) {
-  try {
-    const res = await fetch(`/api/menu/${id}/soldout`, {
-      method: 'PATCH',
-      headers: { 'x-admin-token': sessionStorage.getItem('adminToken') }
-    });
-    if (res.ok) {
-      await fetchMenu();
-      renderAdminMenuList();
-    } else {
-      showToast('Failed to sync status', 'error');
-    }
-  } catch (err) {
-    console.error(err);
-  }
 }
