@@ -373,6 +373,45 @@ function renderCheckoutSummary(totalItems, totalPrice) {
   submitBtn.disabled = false;
   actionTotalEl.textContent = `₹${totalPrice}`;
 
+  const reviewItemsMarkup = cart.map(item => `
+    <div class="review-item">
+      <div class="review-item-copy">
+        <strong>${item.name}</strong>
+        <span>₹${item.price} each</span>
+      </div>
+      <div class="review-item-actions">
+        <div class="review-qty">
+          <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)" aria-label="Decrease ${item.name} quantity">−</button>
+          <span class="qty-number">${item.qty}</span>
+          <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)" aria-label="Increase ${item.name} quantity">+</button>
+        </div>
+        <span class="review-line-total">₹${item.price * item.qty}</span>
+      </div>
+    </div>
+  `).join('');
+
+  const useCompactMobileSummary = window.matchMedia('(max-width: 768px)').matches;
+  const summaryItemsMarkup = useCompactMobileSummary
+    ? `
+      <details class="checkout-summary-disclosure" ${cart.length <= 2 ? 'open' : ''}>
+        <summary class="checkout-summary-toggle">
+          <span class="checkout-summary-toggle-copy">Review order items</span>
+          <span class="checkout-summary-toggle-meta">
+            <strong>${totalItems} ${totalItems === 1 ? 'item' : 'items'}</strong>
+            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+          </span>
+        </summary>
+        <div class="checkout-summary-items">
+          ${reviewItemsMarkup}
+        </div>
+      </details>
+    `
+    : `
+      <div class="checkout-summary-items">
+        ${reviewItemsMarkup}
+      </div>
+    `;
+
   summaryEl.innerHTML = `
     <div class="checkout-summary-head">
       <div>
@@ -383,24 +422,7 @@ function renderCheckoutSummary(totalItems, totalPrice) {
         Clear cart
       </button>
     </div>
-    <div class="checkout-summary-items">
-      ${cart.map(item => `
-        <div class="review-item">
-          <div class="review-item-copy">
-            <strong>${item.name}</strong>
-            <span>₹${item.price} each</span>
-          </div>
-          <div class="review-item-actions">
-            <div class="review-qty">
-              <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)" aria-label="Decrease ${item.name} quantity">−</button>
-              <span class="qty-number">${item.qty}</span>
-              <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)" aria-label="Increase ${item.name} quantity">+</button>
-            </div>
-            <span class="review-line-total">₹${item.price * item.qty}</span>
-          </div>
-        </div>
-      `).join('')}
-    </div>
+    ${summaryItemsMarkup}
     <div class="review-total">
       <span>Total</span>
       <span>₹${totalPrice}</span>
@@ -439,6 +461,7 @@ function setupCheckout() {
     renderCheckoutSummary(totals.items, totals.total);
     modal.classList.add('active');
     document.body.classList.add('checkout-open');
+    modal.querySelector('.checkout-layout')?.scrollTo({ top: 0 });
 
     if (!window.matchMedia('(max-width: 768px)').matches) {
       const firstEmptyField = form.querySelector('input:invalid, textarea:invalid') || document.getElementById('customerName');
@@ -465,6 +488,12 @@ function setupCheckout() {
       const totals = getTotals();
       renderCheckoutSummary(totals.items, totals.total);
     });
+  });
+
+  window.addEventListener('resize', () => {
+    if (!modal.classList.contains('active')) return;
+    const totals = getTotals();
+    renderCheckoutSummary(totals.items, totals.total);
   });
 
   modal.addEventListener('click', (e) => {
