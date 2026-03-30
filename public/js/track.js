@@ -124,7 +124,24 @@ function normalizePhone(value = '') {
 
 function normalizeOrderId(value = '') {
   const normalized = String(value || '').trim().toUpperCase();
-  return /^[A-Z0-9-]{4,32}$/.test(normalized) ? normalized : '';
+  return /^FDNL-\d{8}-\d{3,6}$/.test(normalized) ? normalized : '';
+}
+
+function normalizeTrackingRef(value = '') {
+  const normalized = String(value || '').trim().toUpperCase();
+  return /^[A-Z0-9]{10,24}$/.test(normalized) ? normalized : '';
+}
+
+function getTrackingRef(order) {
+  const raw = String(order?.trackingRef || order?.id || '').trim().toUpperCase();
+  return normalizeTrackingRef(raw) || normalizeOrderId(raw) || '';
+}
+
+function maskPhoneForDisplay(value = '') {
+  const digits = normalizePhone(value);
+  if (!digits) return 'your number';
+  if (digits.length <= 4) return digits;
+  return `${'*'.repeat(Math.max(2, digits.length - 4))}${digits.slice(-4)}`;
 }
 
 function isOrderActive(order) {
@@ -195,11 +212,13 @@ function mergeTrackedOrders(orders, selectedId = '') {
   orders.forEach(order => {
     if (!order?.id) return;
     trackedOrders.set(order.id, order);
+    const previousEntry = recentMap.get(order.id) || {};
     recentMap.set(order.id, {
       id: order.id,
+      trackingRef: getTrackingRef(order) || previousEntry.trackingRef || order.id,
       createdAt: order.createdAt || new Date().toISOString(),
-      customerPhone: order.customerPhone || '',
-      customerName: order.customerName || ''
+      customerPhone: order.customerPhone || previousEntry.customerPhone || '',
+      customerName: order.customerName || previousEntry.customerName || ''
     });
     if (order.customerPhone) state.customerPhone = order.customerPhone;
     if (order.customerName) state.customerName = order.customerName;
@@ -240,10 +259,10 @@ function removeTrackedOrderFromDevice(orderId) {
 }
 
 async function fetchOrderById(orderId) {
-  const normalizedId = normalizeOrderId(orderId);
-  if (!normalizedId) throw new Error('No matching order found');
+  const normalizedLookup = normalizeTrackingRef(orderId) || normalizeOrderId(orderId);
+  if (!normalizedLookup) throw new Error('No matching order found');
 
-  const res = await fetch(`/api/orders/public/${encodeURIComponent(normalizedId)}`);
+  const res = await fetch(`/api/orders/public/${encodeURIComponent(normalizedLookup)}`);
   if (!res.ok) {
     throw new Error('No matching order found');
   }
@@ -251,10 +270,15 @@ async function fetchOrderById(orderId) {
 }
 
 async function fetchOrdersByIds(orderIds) {
-  const ids = [...new Set(orderIds.map(normalizeOrderId).filter(Boolean))].slice(0, 10);
-  if (!ids.length) return [];
+  const refs = [...new Set(orderIds.map(normalizeTrackingRef).filter(Boolean))].slice(0, 8);
+  const ids = [...new Set(orderIds.map(normalizeOrderId).filter(Boolean))].slice(0, 8);
+  if (!refs.length && !ids.length) return [];
 
-  const res = await fetch(`/api/orders/public?ids=${encodeURIComponent(ids.join(','))}`);
+  const params = new URLSearchParams();
+  if (refs.length) params.set('refs', refs.join(','));
+  if (ids.length) params.set('ids', ids.join(','));
+
+  const res = await fetch(`/api/orders/public?${params.toString()}`);
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.error || 'Failed to fetch recent orders');
@@ -275,7 +299,9 @@ async function fetchOrdersByPhone(phone) {
 
 async function bootstrapTracking() {
   const params = new URLSearchParams(window.location.search);
+  const requestedTrackingRef = normalizeTrackingRef(params.get('ref'));
   const requestedOrderId = normalizeOrderId(params.get('orderId'));
+  const requestedLookup = requestedTrackingRef || requestedOrderId;
   const requestedPhone = normalizePhone(params.get('phone'));
   const sessionOrderId = readSessionActiveOrderId();
   const state = readTrackingState();
@@ -294,14 +320,15 @@ async function bootstrapTracking() {
 
   if (requestedPhone) {
     document.getElementById('lookupPhone').value = requestedPhone;
-    await handlePhoneLookup(requestedPhone, { autoSelect: !requestedOrderId, quiet: true });
+    await handlePhoneLookup(requestedPhone, { autoSelect: !requestedLookup, quiet: true });
   }
 
-  if (requestedOrderId) {
+  if (requestedLookup) {
     try {
-      const existing = trackedOrders.get(requestedOrderId) || await fetchOrderById(requestedOrderId);
-      mergeTrackedOrders([existing], requestedOrderId);
-      selectOrder(requestedOrderId, { updateUrl: false });
+      const existing = [...trackedOrders.values()].find(order => getTrackingRef(order) === requestedLookup)
+        || await fetchOrderById(requestedLookup);
+      mergeTrackedOrders([existing], existing.id);
+      selectOrder(existing.id, { updateUrl: false });
       scrollSelectedOrderIntoView();
       return;
     } catch (err) {
@@ -314,7 +341,7 @@ async function bootstrapTracking() {
   if (fallbackId && trackedOrders.has(fallbackId)) {
     selectOrder(fallbackId, { updateUrl: false });
   } else {
-    if (!requestedOrderId && !requestedPhone && latestState.selectedOrderId && !sessionOrderId) {
+    if (!requestedLookup && !requestedPhone && latestState.selectedOrderId && !sessionOrderId) {
       latestState.selectedOrderId = '';
       writeTrackingState(latestState);
     }
@@ -358,24 +385,25 @@ function setupLookupForm() {
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    const orderIdInput = document.getElementById('lookupOrderId');
+    const lookupInput = document.getElementById('lookupOrderId');
     const phoneInput = document.getElementById('lookupPhone');
-    const orderId = normalizeOrderId(orderIdInput?.value);
+    const lookupValue = String(lookupInput?.value || '').trim();
+    const orderLookup = normalizeTrackingRef(lookupValue) || normalizeOrderId(lookupValue);
     const phone = normalizePhone(phoneInput?.value);
 
-    if (!orderId && phone.length < 10) {
+    if (!orderLookup && phone.length < 10) {
       showToast('Enter an order ID or a valid phone number', 'error');
       return;
     }
 
-    if (orderId) {
+    if (orderLookup) {
       try {
-        const order = await fetchOrderById(orderId);
+        const order = await fetchOrderById(orderLookup);
         mergeTrackedOrders([order], order.id);
         renderDeviceRecentList();
         selectOrder(order.id);
         scrollSelectedOrderIntoView();
-        showToast(`Loaded order ${order.id}`, 'success');
+        showToast(`Loaded order ${getTrackingRef(order) || order.id}`, 'success');
       } catch (err) {
         showToast(err.message || 'Order not found', 'error');
       }
@@ -460,7 +488,9 @@ function selectOrder(orderId, options = {}) {
   renderPhoneResultsList(null, null, true);
 
   if (updateUrl) {
-    history.replaceState({}, '', `/track?orderId=${encodeURIComponent(order.id)}`);
+    const trackingRef = getTrackingRef(order);
+    const nextParam = trackingRef || order.id;
+    history.replaceState({}, '', `/track?ref=${encodeURIComponent(nextParam)}`);
   }
 }
 
@@ -503,7 +533,7 @@ function renderSelectedOrder(order) {
   document.getElementById('trackingKicker').textContent = copy.kicker;
   document.getElementById('trackingTitle').textContent = copy.title;
   document.getElementById('trackingStatusCopy').textContent = copy.body;
-  document.getElementById('trackingOrderId').textContent = order.id;
+  document.getElementById('trackingOrderId').textContent = getTrackingRef(order) || '--';
   document.getElementById('trackingStatusBadge').textContent = getDisplayStatus(order);
   document.getElementById('trackingStatusBadge').className = `tracking-status-badge ${stage}`;
   document.getElementById('trackingItemCount').textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
@@ -638,7 +668,7 @@ function renderPhoneResultsList(orders, phone, preserveExisting = false) {
   }
 
   card.hidden = false;
-  metaEl.textContent = `Showing the latest ${orders.length} order${orders.length === 1 ? '' : 's'} for ${phone}.`;
+  metaEl.textContent = `Showing the latest ${orders.length} order${orders.length === 1 ? '' : 's'} for ${maskPhoneForDisplay(phone)}.`;
   listEl.innerHTML = orders.map(order => renderTrackingListButton(order)).join('');
   listEl.querySelectorAll('[data-order-id]').forEach(button => {
     button.addEventListener('click', () => {
@@ -662,7 +692,7 @@ function renderTrackingListButton(order) {
   return `
     <button type="button" class="tracking-list-item ${selectedId === order.id ? 'active' : ''}" data-order-id="${order.id}">
       <div class="tracking-list-copy">
-        <strong>${order.id}</strong>
+        <strong>${getTrackingRef(order) || order.id}</strong>
         <span>${formatDateTime(order.createdAt)} · ${getDisplayStatus(order)}</span>
       </div>
       <div class="tracking-list-meta">

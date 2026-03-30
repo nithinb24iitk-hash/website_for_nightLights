@@ -130,10 +130,16 @@ function writeSessionActiveOrderId(orderId) {
   }
 }
 
+function getOrderTrackingRef(order) {
+  return String(order?.trackingRef || order?.trackingToken || order?.id || '').trim();
+}
+
 function rememberTrackedOrder(order) {
   const state = readTrackingState();
+  const trackingRef = getOrderTrackingRef(order);
   const recentEntry = {
     id: order.id,
+    trackingRef,
     createdAt: order.createdAt || new Date().toISOString(),
     customerPhone: order.customerPhone || '',
     customerName: order.customerName || ''
@@ -180,11 +186,13 @@ async function refreshTrackingStateFromServer() {
     const recentMap = new Map(state.recentOrders.map(entry => [entry.id, entry]));
 
     orders.forEach(order => {
+      const previousEntry = recentMap.get(order.id) || {};
       recentMap.set(order.id, {
         id: order.id,
+        trackingRef: getOrderTrackingRef(order) || previousEntry.trackingRef || order.id,
         createdAt: order.createdAt || new Date().toISOString(),
-        customerPhone: order.customerPhone || '',
-        customerName: order.customerName || ''
+        customerPhone: order.customerPhone || previousEntry.customerPhone || '',
+        customerName: order.customerName || previousEntry.customerName || ''
       });
       if (order.customerPhone) state.customerPhone = order.customerPhone;
       if (order.customerName) state.customerName = order.customerName;
@@ -220,7 +228,9 @@ async function handleActiveOrderRouting() {
   }
 
   if (hasSessionActiveOrder && !addMoreMode) {
-    window.location.replace(`/track?orderId=${encodeURIComponent(sessionOrderId)}`);
+    const sessionOrderEntry = state.recentOrders.find(entry => entry.id === sessionOrderId);
+    const trackingRef = String(sessionOrderEntry?.trackingRef || sessionOrderId || '').trim();
+    window.location.replace(`/track?ref=${encodeURIComponent(trackingRef)}`);
     return true;
   }
 
@@ -631,13 +641,14 @@ function setupCheckout() {
 
       if (res.ok) {
         const createdOrder = await res.json();
+        const trackingRef = getOrderTrackingRef(createdOrder) || createdOrder.id;
         rememberTrackedOrder(createdOrder);
-        sessionStorage.setItem('trackingFlashMessage', `Order ${createdOrder.id} placed successfully. Live tracking is ready.`);
+        sessionStorage.setItem('trackingFlashMessage', `Order placed. Tracking ref: ${trackingRef}`);
         cart = [];
         renderCart();
         closeCheckout();
         form.reset();
-        window.location.href = `/track?orderId=${encodeURIComponent(createdOrder.id)}`;
+        window.location.href = `/track?ref=${encodeURIComponent(trackingRef)}`;
       } else {
         showToast('Failed to place order. Please try again.', 'error');
       }

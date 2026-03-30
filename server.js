@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const escapeHtml = require('escape-html');
+const crypto = require('crypto');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const multer = require('multer');
@@ -40,6 +41,7 @@ mongoose.connect(MONGO_URI)
 // Order Model
 const orderSchema = new mongoose.Schema({
   id: String,
+  trackingToken: { type: String, unique: true, sparse: true },
   customerName: String,
   customerPhone: String,
   customerPhoneLookup: String,
@@ -223,9 +225,24 @@ async function validateAndPriceOrderItems(rawItems = []) {
   return { items: pricedItems, total };
 }
 
+async function generateTrackingToken() {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const candidate = crypto.randomBytes(8).toString('hex').toUpperCase();
+    const exists = await Order.exists({ trackingToken: candidate });
+    if (!exists) return candidate;
+  }
+
+  throw new Error('Unable to generate tracking token');
+}
+
 function normalizeOrderId(value = '') {
   const normalized = String(value || '').trim().toUpperCase();
-  return /^[A-Z0-9-]{4,32}$/.test(normalized) ? normalized : '';
+  return /^FDNL-\d{8}-\d{3,6}$/.test(normalized) ? normalized : '';
+}
+
+function normalizeTrackingRef(value = '') {
+  const normalized = String(value || '').trim().toUpperCase();
+  return /^[A-Z0-9]{10,24}$/.test(normalized) ? normalized : '';
 }
 
 function normalizeMenuCategory(value = '') {
@@ -262,8 +279,10 @@ function removeUploadedMenuImageByPath(image = '') {
 }
 
 function serializePublicOrder(order) {
+  const trackingRef = normalizeTrackingRef(order.trackingToken) || order.id;
   return {
     id: order.id,
+    trackingRef,
     orderType: order.orderType,
     status: order.status,
     items: order.items || [],
@@ -485,24 +504,46 @@ app.patch('/api/menu/:id/soldout', requireAdmin, async (req, res) => {
 app.get('/api/orders/public', publicOrderLookupLimiter, phoneOrderLookupLimiter, async (req, res) => {
   try {
     const idsParam = String(req.query.ids || '').trim();
+    const refsParam = String(req.query.refs || '').trim();
     const phoneDigits = normalizePhone(req.query.phone || '');
     const phoneLookupKey = normalizePhoneLookupKey(req.query.phone || '');
 
-    if (idsParam) {
+    if (idsParam || refsParam) {
       const ids = idsParam
         .split(',')
         .map(normalizeOrderId)
         .filter(Boolean)
         .slice(0, 8);
+      const refs = refsParam
+        .split(',')
+        .map(normalizeTrackingRef)
+        .filter(Boolean)
+        .slice(0, 8);
 
-      if (!ids.length) {
-        return res.status(400).json({ error: 'Provide valid order IDs' });
+      if (!ids.length && !refs.length) {
+        return res.status(400).json({ error: 'Provide valid tracking refs or order IDs' });
       }
 
-      const orders = await Order.find({ id: { $in: ids } }).sort({ createdAt: -1 });
-      const orderMap = new Map(orders.map(order => [String(order.id), serializePublicOrder(order)]));
+      const filters = [];
+      if (ids.length) {
+        filters.push({ id: { $in: ids } });
+      }
+      if (refs.length) {
+        filters.push({ trackingToken: { $in: refs } });
+      }
 
-      return res.json(ids.map(id => orderMap.get(id)).filter(Boolean));
+      const orders = await Order.find(filters.length === 1 ? filters[0] : { $or: filters }).sort({ createdAt: -1 });
+      const orderMap = new Map();
+      orders.forEach(order => {
+        const payload = serializePublicOrder(order);
+        orderMap.set(String(order.id), payload);
+        if (order.trackingToken) {
+          orderMap.set(String(order.trackingToken), payload);
+        }
+      });
+      const requestedKeys = [...new Set([...refs, ...ids])];
+
+      return res.json(requestedKeys.map(key => orderMap.get(key)).filter(Boolean));
     }
 
     if (phoneDigits && !phoneLookupKey) {
@@ -546,15 +587,25 @@ app.get('/api/orders/public', publicOrderLookupLimiter, phoneOrderLookupLimiter,
   }
 });
 
-// GET a single public order by id
+// GET a single public order by id or tracking ref
 app.get('/api/orders/public/:id', publicOrderLookupLimiter, async (req, res) => {
   try {
-    const orderId = normalizeOrderId(req.params.id);
-    if (!orderId) {
+    const lookup = String(req.params.id || '');
+    const orderId = normalizeOrderId(lookup);
+    const trackingRef = normalizeTrackingRef(lookup);
+    if (!orderId && !trackingRef) {
       return res.status(404).json({ error: 'Unable to locate that order' });
     }
 
-    const order = await Order.findOne({ id: orderId });
+    const filters = [];
+    if (trackingRef) {
+      filters.push({ trackingToken: trackingRef });
+    }
+    if (orderId) {
+      filters.push({ id: orderId });
+    }
+
+    const order = await Order.findOne(filters.length === 1 ? filters[0] : { $or: filters });
     if (!order) {
       return res.status(404).json({ error: 'Unable to locate that order' });
     }
@@ -610,6 +661,7 @@ app.post('/api/orders', async (req, res) => {
     const now = new Date();
     const newOrder = new Order({
       id: await generateOrderId(now),
+      trackingToken: await generateTrackingToken(),
       customerName,
       customerPhone,
       customerPhoneLookup,
