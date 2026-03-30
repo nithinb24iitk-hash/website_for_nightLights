@@ -360,6 +360,7 @@ function renderCart() {
 
   const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
   const totalPrice = cart.reduce((sum, c) => sum + c.price * c.qty, 0);
+  writeStoredCart();
 
   countEl.textContent = totalItems;
 
@@ -393,7 +394,6 @@ function renderCart() {
 
   renderMobileCartBar(totalItems, totalPrice);
   renderCheckoutSummary(totalItems, totalPrice);
-  writeStoredCart();
 }
 
 function renderMobileCartBar(totalItems, totalPrice) {
@@ -439,6 +439,20 @@ function renderCheckoutMeta(totalItems) {
   }
 }
 
+function syncCheckoutFooterSpacing() {
+  const layout = document.querySelector('#checkoutModal .checkout-layout');
+  const actionsBar = document.querySelector('#checkoutModal .checkout-actions-bar');
+  if (!layout || !actionsBar) return;
+
+  if (!window.matchMedia('(max-width: 768px)').matches) {
+    layout.style.removeProperty('--checkout-sticky-offset');
+    return;
+  }
+
+  const footerHeight = Math.ceil(actionsBar.getBoundingClientRect().height);
+  layout.style.setProperty('--checkout-sticky-offset', `${footerHeight + 14}px`);
+}
+
 function renderCheckoutSummary(totalItems, totalPrice) {
   const summaryEl = document.getElementById('checkoutSummary');
   const submitBtn = document.querySelector('#orderForm button[type="submit"]');
@@ -457,6 +471,7 @@ function renderCheckoutSummary(totalItems, totalPrice) {
       </div>
     `;
     submitBtn.disabled = true;
+    syncCheckoutFooterSpacing();
     return;
   }
 
@@ -518,10 +533,17 @@ function renderCheckoutSummary(totalItems, totalPrice) {
       <span>₹${totalPrice}</span>
     </div>
   `;
+  syncCheckoutFooterSpacing();
 }
 
 function clearCart() {
+  if (!cart.length) {
+    writeStoredCart();
+    renderCart();
+    return;
+  }
   cart = [];
+  writeStoredCart();
   renderCart();
 }
 
@@ -551,12 +573,6 @@ function setupCheckout() {
     const layout = modal.querySelector('.checkout-layout');
     if (!layout) return;
 
-    if (isMobileCheckoutView()) {
-      const formTop = Number(form?.offsetTop || 0);
-      layout.scrollTo({ top: Math.max(formTop - 8, 0), left: 0, behavior: 'auto' });
-      return;
-    }
-
     layout.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   };
 
@@ -566,7 +582,10 @@ function setupCheckout() {
     renderCheckoutSummary(totals.items, totals.total);
     modal.classList.add('active');
     document.body.classList.add('checkout-open');
-    requestAnimationFrame(scrollCheckoutIntoView);
+    requestAnimationFrame(() => {
+      syncCheckoutFooterSpacing();
+      scrollCheckoutIntoView();
+    });
 
     if (!isMobileCheckoutView()) {
       const firstEmptyField = form.querySelector('input:invalid, textarea:invalid') || document.getElementById('customerName');
@@ -599,6 +618,7 @@ function setupCheckout() {
     if (!modal.classList.contains('active')) return;
     const totals = getTotals();
     renderCheckoutSummary(totals.items, totals.total);
+    syncCheckoutFooterSpacing();
   });
 
   modal.addEventListener('click', (e) => {
