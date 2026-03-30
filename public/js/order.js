@@ -7,7 +7,84 @@ let dynamicMenu = [];
 let cart = [];
 const TRACKING_STORAGE_KEY = 'frydayTrackingState';
 const TRACKING_SESSION_KEY = 'frydayActiveTrackingOrderId';
-const AI_HELPER_SESSION_HIDE_KEY = 'frydayHideAiHelper';
+const CART_STORAGE_KEY = 'frydayOrderCartState';
+
+function readStoredCart() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function writeStoredCart() {
+  try {
+    if (!cart.length) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      return;
+    }
+
+    const compactCart = cart.map(item => ({
+      id: Number(item.id),
+      qty: Number(item.qty) || 1,
+      name: String(item.name || ''),
+      price: Number(item.price) || 0,
+      image: String(item.image || ''),
+      desc: String(item.desc || ''),
+      category: String(item.category || '')
+    }));
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(compactCart));
+  } catch (err) {
+    // Ignore storage failures and continue checkout flow.
+  }
+}
+
+function hydrateCartFromStorage() {
+  const storedCart = readStoredCart();
+  if (!storedCart.length) {
+    cart = [];
+    return;
+  }
+
+  const menuById = new Map(dynamicMenu.map(item => [Number(item.id), item]));
+  const hasLiveMenu = dynamicMenu.length > 0;
+
+  cart = storedCart.reduce((acc, entry) => {
+    const id = Number(entry.id);
+    const qty = Math.min(50, Math.max(1, Number(entry.qty) || 0));
+    if (!Number.isFinite(id) || !qty) return acc;
+
+    const menuItem = menuById.get(id);
+    if (menuItem && !menuItem.isSoldOut) {
+      acc.push({ ...menuItem, qty });
+      return acc;
+    }
+
+    if (hasLiveMenu) {
+      return acc;
+    }
+
+    const name = String(entry.name || '').trim();
+    const price = Number(entry.price);
+    if (!name || !Number.isFinite(price) || price < 0) {
+      return acc;
+    }
+
+    acc.push({
+      id,
+      qty,
+      name,
+      price,
+      image: String(entry.image || 'images/burger.png'),
+      desc: String(entry.desc || ''),
+      category: String(entry.category || 'other')
+    });
+    return acc;
+  }, []);
+
+  writeStoredCart();
+}
 
 function readTrackingState() {
   try {
@@ -169,140 +246,6 @@ async function handleActiveOrderRouting() {
   return false;
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function hideAIOrderHelper(permanent = false) {
-  const panel = document.getElementById('aiOrderHelper');
-  if (panel) {
-    panel.hidden = true;
-  }
-
-  if (permanent) {
-    sessionStorage.setItem(AI_HELPER_SESSION_HIDE_KEY, '1');
-  }
-}
-
-function applyAiItemsToCart(items) {
-  if (!Array.isArray(items) || !items.length) return 0;
-
-  let addedCount = 0;
-  items.forEach(entry => {
-    const itemId = Number(entry?.id);
-    const qty = Math.max(1, Number(entry?.qty) || 1);
-    const menuItem = dynamicMenu.find(item => item.id === itemId && !item.isSoldOut);
-    if (!menuItem) return;
-
-    const existing = cart.find(item => item.id === itemId);
-    if (existing) {
-      existing.qty += qty;
-    } else {
-      cart.push({ ...menuItem, qty });
-    }
-    addedCount += qty;
-  });
-
-  if (addedCount > 0) {
-    renderCart();
-  }
-
-  return addedCount;
-}
-
-function setupAIOrderHelper() {
-  const panel = document.getElementById('aiOrderHelper');
-  const form = document.getElementById('aiOrderForm');
-  const promptInput = document.getElementById('aiOrderPrompt');
-  const submitBtn = document.getElementById('aiOrderSubmitBtn');
-  const closeBtn = document.getElementById('aiOrderCloseBtn');
-
-  if (!panel || !form || !promptInput || !submitBtn || panel.dataset.bound === '1') {
-    return;
-  }
-
-  panel.dataset.bound = '1';
-
-  closeBtn?.addEventListener('click', () => hideAIOrderHelper(true));
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-
-    const text = promptInput.value.trim();
-    if (text.length < 4) return;
-
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding';
-
-    try {
-      const response = await fetchWithTimeout('/api/ai/order-helper', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      }, 6000);
-
-      if (!response.ok) {
-        hideAIOrderHelper(true);
-        return;
-      }
-
-      const data = await response.json();
-      const added = applyAiItemsToCart(data.items);
-      promptInput.value = '';
-
-      if (added > 0) {
-        showToast(`${added} item${added === 1 ? '' : 's'} added`, 'success');
-      }
-    } catch (_) {
-      hideAIOrderHelper(true);
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Add with AI';
-    }
-  });
-}
-
-async function initAIOrderHelper() {
-  if (sessionStorage.getItem(AI_HELPER_SESSION_HIDE_KEY) === '1') {
-    hideAIOrderHelper();
-    return;
-  }
-
-  const panel = document.getElementById('aiOrderHelper');
-  if (!panel) return;
-
-  try {
-    const response = await fetchWithTimeout('/api/ai/order-helper/status', {
-      cache: 'no-store'
-    }, 3500);
-
-    if (!response.ok) {
-      hideAIOrderHelper(true);
-      return;
-    }
-
-    const data = await response.json();
-    if (!data?.enabled) {
-      hideAIOrderHelper();
-      return;
-    }
-
-    panel.hidden = false;
-    setupAIOrderHelper();
-  } catch (_) {
-    hideAIOrderHelper(true);
-  }
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
   // Hamburger
   const hamburger = document.getElementById('hamburger');
@@ -323,11 +266,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Failed to load menu data');
   }
 
+  hydrateCartFromStorage();
   renderMenu('all');
   setupFilters();
   setupCheckout();
   renderCart();
-  await initAIOrderHelper();
 });
 
 // Render menu items
@@ -440,6 +383,7 @@ function renderCart() {
 
   renderMobileCartBar(totalItems, totalPrice);
   renderCheckoutSummary(totalItems, totalPrice);
+  writeStoredCart();
 }
 
 function renderMobileCartBar(totalItems, totalPrice) {
@@ -591,15 +535,30 @@ function setupCheckout() {
     total: cart.reduce((sum, c) => sum + c.price * c.qty, 0)
   });
 
+  const isMobileCheckoutView = () => window.matchMedia('(max-width: 768px)').matches;
+
+  const scrollCheckoutIntoView = () => {
+    const layout = modal.querySelector('.checkout-layout');
+    if (!layout) return;
+
+    if (isMobileCheckoutView()) {
+      const formTop = Number(form?.offsetTop || 0);
+      layout.scrollTo({ top: Math.max(formTop - 8, 0), left: 0, behavior: 'auto' });
+      return;
+    }
+
+    layout.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  };
+
   const openCheckout = () => {
     if (cart.length === 0) return;
     const totals = getTotals();
     renderCheckoutSummary(totals.items, totals.total);
     modal.classList.add('active');
     document.body.classList.add('checkout-open');
-    modal.querySelector('.checkout-layout')?.scrollTo({ top: 0 });
+    requestAnimationFrame(scrollCheckoutIntoView);
 
-    if (!window.matchMedia('(max-width: 768px)').matches) {
+    if (!isMobileCheckoutView()) {
       const firstEmptyField = form.querySelector('input:invalid, textarea:invalid') || document.getElementById('customerName');
       firstEmptyField?.focus({ preventScroll: true });
     }

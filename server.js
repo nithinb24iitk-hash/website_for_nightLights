@@ -14,10 +14,6 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fryday@admin2026';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'fryday-admin-token-secret';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/fryday';
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
-const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'google/gemma-3n-e2b-it';
-const AI_ORDER_HELPER_ENABLED = process.env.ENABLE_AI_ORDER_HELPER !== 'false' && Boolean(NVIDIA_API_KEY);
-const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 9000);
 const MENU_UPLOAD_DIR = path.join(__dirname, 'public', 'uploads', 'menu');
 const MENU_UPLOAD_DIR_RESOLVED = path.resolve(MENU_UPLOAD_DIR);
 const MENU_DEFAULT_IMAGES = Object.freeze({
@@ -184,62 +180,6 @@ function removeUploadedMenuImageByPath(image = '') {
   fs.unlink(filePath, () => {});
 }
 
-function extractJsonFromText(text = '') {
-  const source = String(text || '').trim();
-  if (!source) return null;
-
-  const fenced = source.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const candidate = fenced ? fenced[1] : source;
-
-  try {
-    return JSON.parse(candidate);
-  } catch (_) {
-    // Fallback: parse first JSON object block when model includes extra text.
-    const firstOpen = candidate.indexOf('{');
-    const lastClose = candidate.lastIndexOf('}');
-    if (firstOpen === -1 || lastClose === -1 || firstOpen >= lastClose) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(candidate.slice(firstOpen, lastClose + 1));
-    } catch (_) {
-      return null;
-    }
-  }
-}
-
-function buildAiOrderPayload(raw, menuItems) {
-  const parsed = typeof raw === 'object' && raw ? raw : null;
-  if (!parsed || !Array.isArray(parsed.items)) {
-    return [];
-  }
-
-  const menuMap = new Map(menuItems.map(item => [Number(item.id), item]));
-  const aggregated = new Map();
-
-  parsed.items.forEach(entry => {
-    const itemId = Number(entry?.id);
-    const qty = Math.min(8, Math.max(1, Number(entry?.qty) || 1));
-    const menuItem = menuMap.get(itemId);
-    if (!menuItem) return;
-
-    aggregated.set(itemId, (aggregated.get(itemId) || 0) + qty);
-  });
-
-  return [...aggregated.entries()].map(([id, qty]) => {
-    const item = menuMap.get(id);
-    return {
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      price: item.price,
-      image: item.image,
-      qty
-    };
-  });
-}
-
 function serializePublicOrder(order) {
   return {
     id: order.id,
@@ -305,12 +245,6 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-const aiOrderLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 8,
-  message: { error: 'AI helper is busy right now.', disableClient: true }
-});
-
 app.use(express.static('public', { extensions: ['html'] }));
 
 // Admin login
@@ -331,84 +265,6 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
-
-app.get('/api/ai/order-helper/status', (_req, res) => {
-  res.json({ enabled: AI_ORDER_HELPER_ENABLED });
-});
-
-app.post('/api/ai/order-helper', aiOrderLimiter, async (req, res) => {
-  if (!AI_ORDER_HELPER_ENABLED) {
-    return res.status(404).json({ error: 'AI helper disabled', disableClient: true });
-  }
-
-  const userText = String(req.body?.text || '').trim();
-  if (userText.length < 4 || userText.length > 300) {
-    return res.status(400).json({ error: 'Provide a short order request' });
-  }
-
-  try {
-    const menuItems = await MenuItem.find({ isSoldOut: { $ne: true } }).sort({ id: 1 }).lean();
-    if (!menuItems.length) {
-      return res.status(503).json({ error: 'Menu unavailable', disableClient: true });
-    }
-
-    const menuCatalog = menuItems
-      .map(item => `${item.id} | ${item.name} | ${item.category} | ₹${item.price} | ${item.desc || ''}`)
-      .join('\n');
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
-
-    let providerResponse;
-    try {
-      providerResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: NVIDIA_MODEL,
-          temperature: 0.15,
-          max_tokens: 280,
-          messages: [
-            {
-              role: 'system',
-              content: 'You convert restaurant order requests into JSON only. Output strict JSON object: {"items":[{"id":number,"qty":number}]} using only menu ids listed by the user. No markdown, no explanation.'
-            },
-            {
-              role: 'user',
-              content: `Menu:\n${menuCatalog}\n\nCustomer request:\n${userText}\n\nReturn only JSON.`
-            }
-          ]
-        }),
-        signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (!providerResponse.ok) {
-      return res.status(503).json({ error: 'AI helper unavailable', disableClient: true });
-    }
-
-    const providerData = await providerResponse.json();
-    const rawContent = providerData?.choices?.[0]?.message?.content;
-    const content = Array.isArray(rawContent)
-      ? rawContent.map(part => String(part?.text || '')).join('\n')
-      : String(rawContent || '');
-
-    const parsed = extractJsonFromText(content);
-    const items = buildAiOrderPayload(parsed, menuItems);
-
-    res.json({
-      items,
-      matched: items.length
-    });
-  } catch (err) {
-    res.status(503).json({ error: 'AI helper unavailable', disableClient: true });
-  }
-});
 
 // GET all menu items (public)
 app.get('/api/menu', async (req, res) => {
