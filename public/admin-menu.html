@@ -90,7 +90,7 @@
       </div>
 
       <section class="menu-admin-shell">
-        <aside class="menu-editor glass-premium">
+        <aside class="menu-editor glass-premium" id="menuEditorPanel">
           <div class="menu-editor-head">
             <div>
               <div class="section-label"><i class="fas fa-circle"></i> Item Editor</div>
@@ -126,8 +126,22 @@
             </div>
 
             <div class="form-group">
-              <label for="menuItemImage">Image URL</label>
-              <input type="url" id="menuItemImage" placeholder="Leave blank to use the category default">
+              <label for="menuItemImageFile">Item Image</label>
+              <div class="menu-image-field">
+                <label class="menu-image-dropzone" for="menuItemImageFile">
+                  <input type="file" id="menuItemImageFile" accept="image/*">
+                  <span class="menu-image-dropzone-copy">
+                    <strong>Upload image</strong>
+                    <span>PNG, JPG, or WEBP up to 3MB. Leave empty to use the category artwork.</span>
+                  </span>
+                  <span class="menu-image-dropzone-action"><i class="fas fa-upload"></i> Choose File</span>
+                </label>
+                <div class="menu-image-meta">
+                  <span id="menuImageSelectionLabel">Using category artwork</span>
+                  <button type="button" class="btn btn-ghost menu-image-clear" id="clearMenuImageBtn" hidden>Remove Upload</button>
+                </div>
+              </div>
+              <input type="hidden" id="menuItemImageCurrent">
             </div>
 
             <div class="form-group">

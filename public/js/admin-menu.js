@@ -9,16 +9,19 @@ const MENU_CATEGORY_MAP = {
   milkshakes: { label: 'Milkshakes', image: 'images/milkshakes.png' },
   desserts: { label: 'Desserts', image: 'images/desserts.png' }
 };
+const MAX_MENU_IMAGE_SIZE = 3 * 1024 * 1024;
 
 let dynamicMenu = [];
 let adminToken = sessionStorage.getItem('adminToken') || '';
 let currentStatusFilter = 'all';
+let menuImageObjectUrl = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   setupHamburger();
   setupLogin();
   setupMenuEditor();
   setupMenuFilters();
+  window.addEventListener('beforeunload', clearMenuImageObjectUrl);
 
   if (adminToken) {
     showMenuManager();
@@ -39,7 +42,6 @@ function setupHamburger() {
 
 function authHeaders() {
   return {
-    'Content-Type': 'application/json',
     'x-admin-token': adminToken
   };
 }
@@ -118,8 +120,105 @@ function getCategoryMeta(category) {
   return MENU_CATEGORY_MAP[category] || { label: category || 'Menu', image: 'images/burger.png' };
 }
 
+function isDefaultMenuImagePath(imagePath = '') {
+  return Object.values(MENU_CATEGORY_MAP).some(meta => meta.image === imagePath);
+}
+
 function formatCurrency(value = 0) {
   return `₹${Number(value || 0).toLocaleString('en-IN')}`;
+}
+
+function clearMenuImageObjectUrl() {
+  if (menuImageObjectUrl) {
+    URL.revokeObjectURL(menuImageObjectUrl);
+    menuImageObjectUrl = '';
+  }
+}
+
+function getSelectedMenuImageFile() {
+  return document.getElementById('menuItemImageFile')?.files?.[0] || null;
+}
+
+function getRetainedMenuImage() {
+  return document.getElementById('menuItemImageCurrent').value.trim();
+}
+
+function updateMenuImageMeta() {
+  const label = document.getElementById('menuImageSelectionLabel');
+  const clearBtn = document.getElementById('clearMenuImageBtn');
+  const category = document.getElementById('menuItemCategory').value || 'burgers';
+  const categoryImage = getCategoryMeta(category).image;
+  const selectedFile = getSelectedMenuImageFile();
+  const retainedImage = getRetainedMenuImage();
+
+  if (selectedFile) {
+    label.textContent = `Selected upload: ${selectedFile.name}`;
+    clearBtn.textContent = 'Remove Upload';
+    clearBtn.hidden = false;
+    return;
+  }
+
+  if (retainedImage) {
+    label.textContent = retainedImage === categoryImage ? 'Using category artwork' : 'Keeping current image';
+    clearBtn.textContent = 'Use Category Artwork';
+    clearBtn.hidden = retainedImage === categoryImage;
+    return;
+  }
+
+  label.textContent = 'Using category artwork';
+  clearBtn.hidden = true;
+}
+
+function handleMenuImageSelection() {
+  const input = document.getElementById('menuItemImageFile');
+  const file = input?.files?.[0];
+
+  clearMenuImageObjectUrl();
+
+  if (!file) {
+    updateMenuImageMeta();
+    renderPreviewCard();
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    input.value = '';
+    showToast('Select a valid image file.', 'error');
+    updateMenuImageMeta();
+    renderPreviewCard();
+    return;
+  }
+
+  if (file.size > MAX_MENU_IMAGE_SIZE) {
+    input.value = '';
+    showToast('Image size must stay under 3MB.', 'error');
+    updateMenuImageMeta();
+    renderPreviewCard();
+    return;
+  }
+
+  menuImageObjectUrl = URL.createObjectURL(file);
+  updateMenuImageMeta();
+  renderPreviewCard();
+}
+
+function clearCurrentMenuImage() {
+  const fileInput = document.getElementById('menuItemImageFile');
+  const retainedInput = document.getElementById('menuItemImageCurrent');
+  const hadSelectedFile = Boolean(getSelectedMenuImageFile());
+
+  if (fileInput) {
+    fileInput.value = '';
+  }
+
+  clearMenuImageObjectUrl();
+
+  if (retainedInput && !hadSelectedFile) {
+    retainedInput.value = '';
+  }
+
+  updateMenuImageMeta();
+  renderPreviewCard();
 }
 
 function getPreviewState() {
@@ -128,7 +227,7 @@ function getPreviewState() {
   const name = document.getElementById('menuItemName').value.trim() || 'New menu item';
   const desc = document.getElementById('menuItemDesc').value.trim() || 'Description will appear here as you type.';
   const price = document.getElementById('menuItemPrice').value;
-  const image = document.getElementById('menuItemImage').value.trim() || categoryMeta.image;
+  const image = menuImageObjectUrl || getRetainedMenuImage() || categoryMeta.image;
   const isSoldOut = document.getElementById('menuItemSoldOut').checked;
 
   return {
@@ -143,6 +242,7 @@ function getPreviewState() {
 }
 
 function renderPreviewCard() {
+  updateMenuImageMeta();
   const preview = getPreviewState();
   document.getElementById('menuPreviewImage').src = preview.image;
   document.getElementById('menuPreviewImage').alt = preview.name;
@@ -166,25 +266,44 @@ function updateEditorMode() {
   document.getElementById('cancelMenuEditBtn').style.display = isEditing ? 'inline-flex' : 'none';
 }
 
-function resetMenuEditor() {
+function scrollEditorIntoView() {
+  const editor = document.getElementById('menuEditorPanel');
+  if (!editor) return;
+
+  const top = window.scrollY + editor.getBoundingClientRect().top - 96;
+  window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+}
+
+function resetMenuEditor({ scrollToEditor = false } = {}) {
   document.getElementById('menuItemForm').reset();
   document.getElementById('editingMenuId').value = '';
   document.getElementById('menuItemCategory').value = 'burgers';
+  document.getElementById('menuItemImageCurrent').value = '';
+  document.getElementById('menuItemImageFile').value = '';
+  clearMenuImageObjectUrl();
   updateEditorMode();
+  updateMenuImageMeta();
   renderPreviewCard();
+
+  if (scrollToEditor) {
+    scrollEditorIntoView();
+  }
 }
 
 function populateEditor(item) {
+  clearMenuImageObjectUrl();
   document.getElementById('editingMenuId').value = String(item.id);
   document.getElementById('menuItemName').value = item.name || '';
   document.getElementById('menuItemCategory').value = item.category || 'burgers';
   document.getElementById('menuItemPrice').value = item.price || '';
-  document.getElementById('menuItemImage').value = item.image || '';
+  document.getElementById('menuItemImageCurrent').value = item.image && !isDefaultMenuImagePath(item.image) ? item.image : '';
+  document.getElementById('menuItemImageFile').value = '';
   document.getElementById('menuItemDesc').value = item.desc || '';
   document.getElementById('menuItemSoldOut').checked = Boolean(item.isSoldOut);
   updateEditorMode();
+  updateMenuImageMeta();
   renderPreviewCard();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  scrollEditorIntoView();
 }
 
 function setupMenuEditor() {
@@ -193,12 +312,16 @@ function setupMenuEditor() {
   const newItemBtn = document.getElementById('newMenuItemBtn');
   const resetBtn = document.getElementById('resetMenuEditorBtn');
   const cancelBtn = document.getElementById('cancelMenuEditBtn');
+  const imageInput = document.getElementById('menuItemImageFile');
+  const clearImageBtn = document.getElementById('clearMenuImageBtn');
   const cardGrid = document.getElementById('menuManagerGrid');
 
-  ['menuItemName', 'menuItemCategory', 'menuItemPrice', 'menuItemImage', 'menuItemDesc', 'menuItemSoldOut'].forEach(id => {
+  ['menuItemName', 'menuItemCategory', 'menuItemPrice', 'menuItemDesc', 'menuItemSoldOut'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', renderPreviewCard);
     document.getElementById(id)?.addEventListener('change', renderPreviewCard);
   });
+  imageInput?.addEventListener('change', handleMenuImageSelection);
+  clearImageBtn?.addEventListener('click', clearCurrentMenuImage);
 
   form?.addEventListener('submit', submitMenuItemForm);
   refreshBtn?.addEventListener('click', async () => {
@@ -207,9 +330,9 @@ function setupMenuEditor() {
     renderMenuList();
     showToast('Menu refreshed', 'success');
   });
-  newItemBtn?.addEventListener('click', resetMenuEditor);
-  resetBtn?.addEventListener('click', resetMenuEditor);
-  cancelBtn?.addEventListener('click', resetMenuEditor);
+  newItemBtn?.addEventListener('click', () => resetMenuEditor({ scrollToEditor: true }));
+  resetBtn?.addEventListener('click', () => resetMenuEditor({ scrollToEditor: true }));
+  cancelBtn?.addEventListener('click', () => resetMenuEditor({ scrollToEditor: true }));
 
   cardGrid?.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-action]');
@@ -235,6 +358,7 @@ function setupMenuEditor() {
   });
 
   updateEditorMode();
+  updateMenuImageMeta();
 }
 
 async function submitMenuItemForm(event) {
@@ -245,10 +369,11 @@ async function submitMenuItemForm(event) {
     name: document.getElementById('menuItemName').value.trim(),
     category: document.getElementById('menuItemCategory').value,
     price: Number(document.getElementById('menuItemPrice').value),
-    image: document.getElementById('menuItemImage').value.trim(),
     desc: document.getElementById('menuItemDesc').value.trim(),
-    isSoldOut: document.getElementById('menuItemSoldOut').checked
+    isSoldOut: document.getElementById('menuItemSoldOut').checked,
+    currentImage: getRetainedMenuImage()
   };
+  const imageFile = getSelectedMenuImageFile();
 
   if (!payload.name || !payload.category || !payload.price) {
     showToast('Name, category, and price are required.', 'error');
@@ -259,10 +384,21 @@ async function submitMenuItemForm(event) {
   submitBtn.disabled = true;
 
   try {
+    const formData = new FormData();
+    formData.append('name', payload.name);
+    formData.append('category', payload.category);
+    formData.append('price', String(payload.price));
+    formData.append('desc', payload.desc);
+    formData.append('isSoldOut', String(payload.isSoldOut));
+    formData.append('currentImage', payload.currentImage);
+    if (imageFile) {
+      formData.append('imageFile', imageFile);
+    }
+
     const res = await fetch(editingId ? `/api/menu/${editingId}` : '/api/menu', {
       method: editingId ? 'PATCH' : 'POST',
       headers: authHeaders(),
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     if (handleUnauthorized(res)) return;

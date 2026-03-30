@@ -4,13 +4,27 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const escapeHtml = require('escape-html');
+const fs = require('fs');
 const mongoose = require('mongoose');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fryday@admin2026';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'fryday-admin-token-secret';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/fryday';
+const MENU_UPLOAD_DIR = path.join(__dirname, 'public', 'uploads', 'menu');
+const MENU_UPLOAD_DIR_RESOLVED = path.resolve(MENU_UPLOAD_DIR);
+const MENU_DEFAULT_IMAGES = Object.freeze({
+  burgers: 'images/burger.png',
+  fries: 'images/fries.png',
+  pizza: 'images/pizza.png',
+  milkshakes: 'images/milkshakes.png',
+  desserts: 'images/desserts.png'
+});
+
+fs.mkdirSync(MENU_UPLOAD_DIR, { recursive: true });
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI)
@@ -53,6 +67,47 @@ const menuItemSchema = new mongoose.Schema({
 });
 const MenuItem = mongoose.model('MenuItem', menuItemSchema);
 
+const menuUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, MENU_UPLOAD_DIR),
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname || '').toLowerCase();
+      const safeExtension = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(extension) ? extension : '.jpg';
+      callback(null, `menu-${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`);
+    }
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('INVALID_IMAGE_TYPE'));
+  }
+});
+
+function handleMenuUpload(req, res, next) {
+  menuUpload.single('imageFile')(req, res, err => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      res.status(400).json({ error: 'Image size must stay under 3MB' });
+      return;
+    }
+
+    if (err.message === 'INVALID_IMAGE_TYPE') {
+      res.status(400).json({ error: 'Only image files are allowed' });
+      return;
+    }
+
+    res.status(400).json({ error: 'Failed to process image upload' });
+  });
+}
+
 function getOrderDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
@@ -90,6 +145,39 @@ function buildFlexiblePhonePattern(digits) {
 function normalizeOrderId(value = '') {
   const normalized = String(value || '').trim().toUpperCase();
   return /^[A-Z0-9-]{4,32}$/.test(normalized) ? normalized : '';
+}
+
+function normalizeMenuCategory(value = '') {
+  const category = String(value || '').trim().toLowerCase();
+  return MENU_DEFAULT_IMAGES[category] ? category : 'burgers';
+}
+
+function getDefaultMenuImage(category = 'burgers') {
+  return MENU_DEFAULT_IMAGES[normalizeMenuCategory(category)] || MENU_DEFAULT_IMAGES.burgers;
+}
+
+function parseBoolean(value) {
+  return String(value).toLowerCase() === 'true';
+}
+
+function removeUploadedMenuFile(file) {
+  if (!file?.path) return;
+
+  fs.unlink(file.path, () => {});
+}
+
+function isUploadedMenuImage(image = '') {
+  return /^\/?uploads\/menu\/[^/]+$/i.test(String(image || ''));
+}
+
+function removeUploadedMenuImageByPath(image = '') {
+  if (!isUploadedMenuImage(image)) return;
+
+  const normalized = String(image).replace(/^\/+/, '');
+  const filePath = path.resolve(__dirname, 'public', normalized);
+  if (!filePath.startsWith(MENU_UPLOAD_DIR_RESOLVED)) return;
+
+  fs.unlink(filePath, () => {});
 }
 
 function serializePublicOrder(order) {
@@ -189,68 +277,88 @@ app.get('/api/menu', async (req, res) => {
 });
 
 // POST new menu item (admin only)
-app.post('/api/menu', requireAdmin, async (req, res) => {
+app.post('/api/menu', requireAdmin, handleMenuUpload, async (req, res) => {
   try {
+    const name = escapeHtml(String(req.body.name || '').trim());
+    const category = normalizeMenuCategory(req.body.category);
+    const price = Number(req.body.price);
+    const desc = escapeHtml(String(req.body.desc || '').trim());
+    const isSoldOut = parseBoolean(req.body.isSoldOut);
+
+    if (!name || !Number.isFinite(price) || price <= 0) {
+      removeUploadedMenuFile(req.file);
+      return res.status(400).json({ error: 'Provide a valid name, category, and price' });
+    }
+
     const highestIdItem = await MenuItem.findOne().sort({ id: -1 });
     const nextId = highestIdItem ? highestIdItem.id + 1 : 1;
-
-    // determine image by category or custom URL
-    const category = req.body.category || 'burgers';
-    let imageSrc = req.body.image;
-    
-    if (!imageSrc || imageSrc.trim() === '') {
-      imageSrc = `images/${category}.png`;
-      // fallback if unmapped category
-      if (!['burgers', 'fries', 'pizza', 'milkshakes', 'desserts'].includes(category)) {
-        imageSrc = 'images/burger.png';
-      }
-    }
+    const imageSrc = req.file ? `/uploads/menu/${req.file.filename}` : getDefaultMenuImage(category);
 
     const newItem = new MenuItem({
       id: nextId,
-      name: escapeHtml(req.body.name),
-      category: category,
-      price: Number(req.body.price),
-      desc: escapeHtml(req.body.desc || ''),
+      name,
+      category,
+      price,
+      desc,
       image: imageSrc,
-      isSoldOut: Boolean(req.body.isSoldOut)
+      isSoldOut
     });
 
     await newItem.save();
     res.status(201).json(newItem);
   } catch (err) {
+    removeUploadedMenuFile(req.file);
     res.status(500).json({ error: 'Failed to add menu item' });
   }
 });
 
 // UPDATE menu item (admin only)
-app.patch('/api/menu/:id', requireAdmin, async (req, res) => {
+app.patch('/api/menu/:id', requireAdmin, handleMenuUpload, async (req, res) => {
   try {
     const item = await MenuItem.findOne({ id: Number(req.params.id) });
-    if (!item) return res.status(404).json({ error: 'Item not found' });
-
-    const category = String(req.body.category || item.category || 'burgers').trim() || 'burgers';
-    let imageSrc = typeof req.body.image === 'string' ? req.body.image.trim() : item.image;
-
-    if (!imageSrc) {
-      imageSrc = `images/${category}.png`;
-      if (!['burgers', 'fries', 'pizza', 'milkshakes', 'desserts'].includes(category)) {
-        imageSrc = 'images/burger.png';
-      }
+    if (!item) {
+      removeUploadedMenuFile(req.file);
+      return res.status(404).json({ error: 'Item not found' });
     }
 
-    item.name = escapeHtml(req.body.name || item.name);
+    const name = escapeHtml(String(req.body.name || '').trim());
+    const category = normalizeMenuCategory(req.body.category || item.category);
+    const price = Number(req.body.price);
+    const desc = escapeHtml(String(req.body.desc || '').trim());
+    const retainedImage = String(req.body.currentImage || '').trim();
+
+    if (!name || !Number.isFinite(price) || price <= 0) {
+      removeUploadedMenuFile(req.file);
+      return res.status(400).json({ error: 'Provide a valid name, category, and price' });
+    }
+
+    const previousImage = item.image;
+    let imageSrc = item.image;
+
+    if (req.file) {
+      imageSrc = `/uploads/menu/${req.file.filename}`;
+    } else if (retainedImage && retainedImage === item.image) {
+      imageSrc = item.image;
+    } else {
+      imageSrc = getDefaultMenuImage(category);
+    }
+
+    item.name = name;
     item.category = category;
-    item.price = Number(req.body.price) || item.price;
-    item.desc = escapeHtml(req.body.desc || '');
+    item.price = price;
+    item.desc = desc;
     item.image = imageSrc;
-    if (typeof req.body.isSoldOut === 'boolean') {
-      item.isSoldOut = req.body.isSoldOut;
-    }
+    item.isSoldOut = parseBoolean(req.body.isSoldOut);
 
     await item.save();
+
+    if (previousImage !== imageSrc) {
+      removeUploadedMenuImageByPath(previousImage);
+    }
+
     res.json(item);
   } catch (err) {
+    removeUploadedMenuFile(req.file);
     res.status(500).json({ error: 'Failed to update menu item' });
   }
 });
@@ -260,6 +368,8 @@ app.delete('/api/menu/:id', requireAdmin, async (req, res) => {
   try {
     const result = await MenuItem.findOneAndDelete({ id: Number(req.params.id) });
     if (!result) return res.status(404).json({ error: 'Item not found' });
+
+    removeUploadedMenuImageByPath(result.image);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete item' });

@@ -1175,6 +1175,10 @@ section {
 }
 
 /* Checkout Modal */
+body.checkout-open {
+  overflow: hidden;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1222,6 +1226,7 @@ section {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain;
 }
 
 .checkout-modal-head {
@@ -2208,6 +2213,7 @@ section {
 .menu-editor {
   position: sticky;
   top: 100px;
+  scroll-margin-top: 108px;
 }
 
 .menu-editor-head,
@@ -2287,6 +2293,82 @@ section {
 .menu-editor-switch-copy span {
   color: var(--text-secondary);
   font-size: 0.84rem;
+}
+
+.menu-image-field {
+  display: grid;
+  gap: 12px;
+}
+
+.menu-image-dropzone {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.menu-image-dropzone:hover {
+  border-color: rgba(0, 240, 255, 0.38);
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.08), rgba(255, 255, 255, 0.03));
+  transform: translateY(-1px);
+}
+
+.menu-image-dropzone input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.menu-image-dropzone-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-image-dropzone-copy strong {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.96rem;
+}
+
+.menu-image-dropzone-copy span {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.menu-image-dropzone-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  justify-self: flex-start;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 45, 117, 0.12);
+  color: var(--neon-pink);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.84rem;
+}
+
+.menu-image-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.menu-image-clear {
+  padding-inline: 16px;
 }
 
 .menu-preview-card {
@@ -3261,6 +3343,11 @@ section {
   padding: 32px 24px;
 }
 
+.tracking-empty[hidden],
+.tracking-card[hidden] {
+  display: none !important;
+}
+
 .tracking-empty i {
   font-size: 2.4rem;
   color: var(--neon-pink);
@@ -3348,17 +3435,95 @@ section {
   }
 
   .checkout-modal {
-    width: min(95vw, 720px);
-    padding: 28px 20px;
-    max-height: min(90vh, 760px);
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: 0 16px 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
   }
 
   .checkout-steps {
-    justify-content: flex-start;
+    display: none;
   }
 
   .checkout-close {
-    align-self: flex-end;
+    align-self: flex-start;
+  }
+
+  .checkout-modal-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 -16px 14px;
+    padding: 18px 16px 12px;
+    background: rgba(10, 10, 15, 0.96);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .checkout-modal-head h3 {
+    font-size: 1.22rem;
+  }
+
+  .checkout-modal-head p {
+    font-size: 0.88rem;
+  }
+
+  .checkout-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .checkout-pane-summary.glass-premium {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .checkout-pane-head {
+    margin-bottom: 0;
+  }
+
+  .checkout-eta {
+    justify-self: flex-start;
+  }
+
+  .checkout-mini-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .checkout-stat-pill {
+    padding: 10px 12px;
+  }
+
+  .checkout-review-panel {
+    max-height: none;
+    overflow: visible;
+    padding: 14px;
+  }
+
+  .checkout-benefits {
+    display: none;
+  }
+
+  .checkout-form {
+    overflow: visible;
+    padding-right: 0;
+    gap: 14px;
+  }
+
+  .checkout-form-card {
+    padding: 16px;
   }
 
   .checkout-summary-head,
@@ -3368,12 +3533,16 @@ section {
   }
 
   .review-item {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 
   .review-item-actions {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .checkout-actions {
@@ -3386,6 +3555,12 @@ section {
     z-index: 2;
     background: rgba(15, 17, 25, 0.96);
     backdrop-filter: blur(14px);
+    margin: 4px -16px 0;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
   }
 
   .earnings-order-row {
@@ -3572,6 +3747,11 @@ section {
   .menu-item-admin-media {
     min-height: 180px;
   }
+
+  .menu-image-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 480px) {
@@ -3592,6 +3772,31 @@ section {
   .tracking-hero,
   .tracking-card {
     padding: 16px;
+  }
+
+  .checkout-modal {
+    border-radius: 18px 18px 0 0;
+  }
+
+  .checkout-mini-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .checkout-stat-pill:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .checkout-pane-head h4,
+  .checkout-form-head h4 {
+    font-size: 1rem;
+  }
+
+  .checkout-actions-copy strong {
+    font-size: 1.18rem;
+  }
+
+  .checkout-actions-note {
+    font-size: 0.78rem;
   }
 
   .tracking-snapshot {
@@ -3654,6 +3859,12 @@ section {
     justify-content: center;
   }
 
+  .checkout-actions .btn,
+  .checkout-summary-head .review-clear-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .menu-editor,
   .menu-catalog,
   .menu-item-admin-card,
@@ -3663,6 +3874,7 @@ section {
 
   .menu-item-admin-actions .order-action-btn,
   .menu-editor .form-actions .btn,
+  .menu-image-meta .menu-image-clear,
   .admin-actions .admin-menu-link {
     width: 100%;
     justify-content: center;

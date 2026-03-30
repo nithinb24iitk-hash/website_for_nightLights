@@ -438,12 +438,17 @@ function setupCheckout() {
     const totals = getTotals();
     renderCheckoutSummary(totals.items, totals.total);
     modal.classList.add('active');
-    const firstEmptyField = form.querySelector('input:invalid, textarea:invalid') || document.getElementById('customerName');
-    firstEmptyField?.focus({ preventScroll: true });
+    document.body.classList.add('checkout-open');
+
+    if (!window.matchMedia('(max-width: 768px)').matches) {
+      const firstEmptyField = form.querySelector('input:invalid, textarea:invalid') || document.getElementById('customerName');
+      firstEmptyField?.focus({ preventScroll: true });
+    }
   };
 
   const closeCheckout = () => {
     modal.classList.remove('active');
+    document.body.classList.remove('checkout-open');
   };
 
   checkoutBtn.addEventListener('click', openCheckout);
