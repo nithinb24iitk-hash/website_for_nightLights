@@ -1577,6 +1577,20 @@ body.checkout-open {
   min-height: 80px;
 }
 
+.checkout-privacy-note {
+  margin: -2px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.checkout-privacy-note i {
+  color: var(--neon-cyan);
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -1603,6 +1617,15 @@ body.checkout-open {
 .btn-ghost:hover {
   border-color: rgba(255, 255, 255, 0.2);
   color: var(--text-main);
+}
+
+.checkout-actions .checkout-secondary-btn {
+  flex: 0.7;
+}
+
+.checkout-actions .checkout-primary-btn {
+  flex: 1.3;
+  box-shadow: 0 14px 34px rgba(255, 45, 117, 0.28);
 }
 
 /* ==========================================
@@ -3654,6 +3677,8 @@ body.checkout-open {
 
   .checkout-actions {
     width: 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
   }
 
   .checkout-actions-bar {
