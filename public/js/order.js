@@ -393,7 +393,7 @@ function renderCheckoutSummary(totalItems, totalPrice) {
   const useCompactMobileSummary = window.matchMedia('(max-width: 768px)').matches;
   const summaryItemsMarkup = useCompactMobileSummary
     ? `
-      <details class="checkout-summary-disclosure" ${cart.length <= 2 ? 'open' : ''}>
+      <details class="checkout-summary-disclosure">
         <summary class="checkout-summary-toggle">
           <span class="checkout-summary-toggle-copy">Review order items</span>
           <span class="checkout-summary-toggle-meta">

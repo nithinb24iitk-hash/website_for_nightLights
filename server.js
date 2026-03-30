@@ -128,7 +128,7 @@ async function generateOrderId(now = new Date()) {
   const counter = await Counter.findOneAndUpdate(
     { key: `order:${dateKey}` },
     { $inc: { seq: 1 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   );
 
   return `FDNL-${dateKey}-${String(counter.seq).padStart(3, '0')}`;
@@ -508,7 +508,7 @@ app.patch('/api/orders/:id/status', requireAdmin, async (req, res) => {
     const order = await Order.findOneAndUpdate(
       { id: req.params.id },
       { status: req.body.status },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!order) return res.status(404).json({ error: 'Order not found' });
     res.json(order);
