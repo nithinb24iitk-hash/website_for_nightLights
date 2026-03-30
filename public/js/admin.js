@@ -508,7 +508,7 @@ function setupAdminOrderModal() {
 
     const items = Object.entries(adminCart).map(([itemId, qty]) => {
       const item = dynamicMenu.find(i => i.id === parseInt(itemId));
-      return { name: item.name, qty, price: item.price };
+      return { id: item.id, name: item.name, qty, price: item.price };
     }).filter(i => i.qty > 0);
 
     if (items.length === 0) {

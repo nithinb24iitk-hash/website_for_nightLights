@@ -617,7 +617,7 @@ function setupCheckout() {
       customerPhone: document.getElementById('customerPhone').value,
       orderType: getSelectedOrderType(),
       notes: document.getElementById('orderNotes').value,
-      items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+      items: cart.map(c => ({ id: c.id, name: c.name, qty: c.qty, price: c.price })),
       total: cart.reduce((sum, c) => sum + c.price * c.qty, 0),
       placedBy: 'customer'
     };

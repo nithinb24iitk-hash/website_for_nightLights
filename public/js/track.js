@@ -241,12 +241,11 @@ function removeTrackedOrderFromDevice(orderId) {
 
 async function fetchOrderById(orderId) {
   const normalizedId = normalizeOrderId(orderId);
-  if (!normalizedId) throw new Error('Invalid order ID');
+  if (!normalizedId) throw new Error('No matching order found');
 
   const res = await fetch(`/api/orders/public/${encodeURIComponent(normalizedId)}`);
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Order not found');
+    throw new Error('No matching order found');
   }
   return res.json();
 }
@@ -265,12 +264,11 @@ async function fetchOrdersByIds(orderIds) {
 
 async function fetchOrdersByPhone(phone) {
   const phoneDigits = normalizePhone(phone);
-  if (phoneDigits.length < 6) throw new Error('Enter a valid phone number');
+  if (phoneDigits.length < 10) throw new Error('Enter a valid phone number');
 
   const res = await fetch(`/api/orders/public?phone=${encodeURIComponent(phoneDigits)}`);
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to fetch orders');
+    throw new Error('No matching order found');
   }
   return res.json();
 }
@@ -365,7 +363,7 @@ function setupLookupForm() {
     const orderId = normalizeOrderId(orderIdInput?.value);
     const phone = normalizePhone(phoneInput?.value);
 
-    if (!orderId && phone.length < 6) {
+    if (!orderId && phone.length < 10) {
       showToast('Enter an order ID or a valid phone number', 'error');
       return;
     }

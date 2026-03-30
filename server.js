@@ -23,6 +23,12 @@ const MENU_DEFAULT_IMAGES = Object.freeze({
   milkshakes: 'images/milkshakes.png',
   desserts: 'images/desserts.png'
 });
+const VALID_ORDER_TYPES = new Set(['dine-in', 'takeaway']);
+const MAX_ORDER_ITEMS = 30;
+const MAX_ITEM_QTY = 20;
+const MAX_CUSTOMER_NAME_LENGTH = 60;
+const MAX_CUSTOMER_PHONE_LENGTH = 20;
+const MAX_ORDER_NOTES_LENGTH = 300;
 
 fs.mkdirSync(MENU_UPLOAD_DIR, { recursive: true });
 
@@ -36,6 +42,7 @@ const orderSchema = new mongoose.Schema({
   id: String,
   customerName: String,
   customerPhone: String,
+  customerPhoneLookup: String,
   orderType: String,
   notes: String,
   status: { type: String, default: 'pending' },
@@ -138,8 +145,82 @@ function normalizePhone(value = '') {
   return String(value || '').replace(/\D/g, '').slice(-15);
 }
 
-function buildFlexiblePhonePattern(digits) {
-  return new RegExp(digits.split('').join('\\D*'));
+function normalizePhoneLookupKey(value = '') {
+  const digits = normalizePhone(value);
+  return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+function sanitizeInlineText(value = '', maxLength = 120) {
+  return escapeHtml(String(value || '').replace(/\s+/g, ' ').trim()).slice(0, maxLength);
+}
+
+function normalizeOrderType(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return VALID_ORDER_TYPES.has(normalized) ? normalized : 'dine-in';
+}
+
+async function validateAndPriceOrderItems(rawItems = []) {
+  if (!Array.isArray(rawItems) || !rawItems.length) {
+    return { error: 'Add at least one menu item to continue' };
+  }
+
+  if (rawItems.length > MAX_ORDER_ITEMS) {
+    return { error: 'Too many items in order' };
+  }
+
+  const qtyById = new Map();
+  for (const entry of rawItems) {
+    const itemId = Number(entry?.id);
+    const qty = Number(entry?.qty);
+
+    if (!Number.isInteger(itemId) || !Number.isInteger(qty) || qty < 1 || qty > MAX_ITEM_QTY) {
+      return { error: 'Provide valid item quantities' };
+    }
+
+    const nextQty = (qtyById.get(itemId) || 0) + qty;
+    if (nextQty > MAX_ITEM_QTY) {
+      return { error: 'Quantity is too high for one menu item' };
+    }
+    qtyById.set(itemId, nextQty);
+  }
+
+  const ids = [...qtyById.keys()];
+  const menuItems = await MenuItem.find({ id: { $in: ids } }).select({ id: 1, name: 1, price: 1, isSoldOut: 1 });
+  const menuById = new Map(menuItems.map(item => [Number(item.id), item]));
+
+  if (menuById.size !== ids.length) {
+    return { error: 'Some menu items were not found. Refresh and try again.' };
+  }
+
+  let total = 0;
+  const pricedItems = [];
+
+  for (const itemId of ids) {
+    const menuItem = menuById.get(itemId);
+    if (!menuItem || menuItem.isSoldOut) {
+      return { error: 'Some selected items are sold out right now' };
+    }
+
+    const qty = qtyById.get(itemId) || 0;
+    const unitPrice = Math.round(Number(menuItem.price) || 0);
+    if (qty <= 0 || unitPrice <= 0) {
+      return { error: 'Invalid menu pricing detected. Please refresh and try again.' };
+    }
+
+    total += unitPrice * qty;
+    pricedItems.push({
+      id: menuItem.id,
+      name: menuItem.name,
+      qty,
+      price: unitPrice
+    });
+  }
+
+  if (total <= 0) {
+    return { error: 'Order total must be greater than zero' };
+  }
+
+  return { items: pricedItems, total };
 }
 
 function normalizeOrderId(value = '') {
@@ -183,14 +264,10 @@ function removeUploadedMenuImageByPath(image = '') {
 function serializePublicOrder(order) {
   return {
     id: order.id,
-    customerName: order.customerName,
-    customerPhone: order.customerPhone,
     orderType: order.orderType,
-    notes: order.notes,
     status: order.status,
     items: order.items || [],
     total: Number(order.total) || 0,
-    placedBy: order.placedBy,
     createdAt: order.createdAt,
     isPaid: Boolean(order.isPaid),
     paidAt: order.paidAt || ''
@@ -244,6 +321,19 @@ const limiter = rateLimit({
   message: { error: 'Too many requests from this IP, please try again later.' }
 });
 app.use('/api/', limiter);
+
+const publicOrderLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 45,
+  message: { error: 'Too many tracking lookups. Please try again shortly.' }
+});
+
+const phoneOrderLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  skip: req => !String(req.query.phone || '').trim(),
+  message: { error: 'Too many phone lookups. Please try again later.' }
+});
 
 app.use(express.static('public', { extensions: ['html'] }));
 
@@ -392,17 +482,18 @@ app.patch('/api/menu/:id/soldout', requireAdmin, async (req, res) => {
 });
 
 // GET public orders by ids or phone number
-app.get('/api/orders/public', async (req, res) => {
+app.get('/api/orders/public', publicOrderLookupLimiter, phoneOrderLookupLimiter, async (req, res) => {
   try {
     const idsParam = String(req.query.ids || '').trim();
     const phoneDigits = normalizePhone(req.query.phone || '');
+    const phoneLookupKey = normalizePhoneLookupKey(req.query.phone || '');
 
     if (idsParam) {
       const ids = idsParam
         .split(',')
         .map(normalizeOrderId)
         .filter(Boolean)
-        .slice(0, 10);
+        .slice(0, 8);
 
       if (!ids.length) {
         return res.status(400).json({ error: 'Provide valid order IDs' });
@@ -414,15 +505,37 @@ app.get('/api/orders/public', async (req, res) => {
       return res.json(ids.map(id => orderMap.get(id)).filter(Boolean));
     }
 
-    if (phoneDigits) {
-      if (phoneDigits.length < 6) {
-        return res.status(400).json({ error: 'Enter a valid phone number' });
-      }
+    if (phoneDigits && !phoneLookupKey) {
+      return res.status(400).json({ error: 'Enter a valid phone number' });
+    }
 
-      const phonePattern = buildFlexiblePhonePattern(phoneDigits);
-      const orders = await Order.find({ customerPhone: { $regex: phonePattern } })
+    if (phoneLookupKey) {
+
+      let orders = await Order.find({ customerPhoneLookup: phoneLookupKey })
         .sort({ createdAt: -1 })
-        .limit(8);
+        .limit(5);
+
+      // Backward compatibility: older orders may not have lookup key saved yet.
+      if (!orders.length) {
+        const fallbackCandidates = await Order.find()
+          .sort({ createdAt: -1 })
+          .limit(200);
+
+        orders = fallbackCandidates
+          .filter(order => normalizePhoneLookupKey(order.customerPhone) === phoneLookupKey)
+          .slice(0, 5);
+
+        const docsToBackfill = orders
+          .filter(order => !order.customerPhoneLookup)
+          .map(order => order._id);
+
+        if (docsToBackfill.length) {
+          Order.updateMany(
+            { _id: { $in: docsToBackfill } },
+            { $set: { customerPhoneLookup: phoneLookupKey } }
+          ).catch(() => {});
+        }
+      }
 
       return res.json(orders.map(serializePublicOrder));
     }
@@ -434,16 +547,16 @@ app.get('/api/orders/public', async (req, res) => {
 });
 
 // GET a single public order by id
-app.get('/api/orders/public/:id', async (req, res) => {
+app.get('/api/orders/public/:id', publicOrderLookupLimiter, async (req, res) => {
   try {
     const orderId = normalizeOrderId(req.params.id);
     if (!orderId) {
-      return res.status(400).json({ error: 'Invalid order ID' });
+      return res.status(404).json({ error: 'Unable to locate that order' });
     }
 
     const order = await Order.findOne({ id: orderId });
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: 'Unable to locate that order' });
     }
 
     res.json(serializePublicOrder(order));
@@ -464,26 +577,42 @@ app.get('/api/orders', requireAdmin, async (req, res) => {
 
 // POST new order
 app.post('/api/orders', async (req, res) => {
-  // Basic input validation/sanitization to prevent XSS
-  const customerName = escapeHtml(req.body.customerName || 'Unknown');
-  const customerPhone = escapeHtml(req.body.customerPhone || 'N/A');
-  const orderType = escapeHtml(req.body.orderType || 'dine-in');
-  const notes = escapeHtml(req.body.notes || '');
-  const items = Array.isArray(req.body.items) ? req.body.items : [];
-  const total = Number(req.body.total) || 0;
-  const placedBy = req.body.placedBy === 'admin' ? 'admin' : 'customer';
-
-  // Cap items array size
-  if (items.length > 50) {
-     return res.status(400).json({ error: 'Too many items in order' });
-  }
-
   try {
+    const requestedPlacedBy = req.body.placedBy === 'admin' ? 'admin' : 'customer';
+    const hasAdminToken = req.headers['x-admin-token'] === ADMIN_TOKEN;
+    if (requestedPlacedBy === 'admin' && !hasAdminToken) {
+      return res.status(401).json({ error: 'Unauthorized admin order request' });
+    }
+
+    const customerName = sanitizeInlineText(req.body.customerName || '', MAX_CUSTOMER_NAME_LENGTH);
+    if (customerName.length < 2) {
+      return res.status(400).json({ error: 'Please enter a valid customer name' });
+    }
+
+    const rawCustomerPhone = String(req.body.customerPhone || '').trim();
+    const customerPhoneDigits = normalizePhone(rawCustomerPhone);
+    const customerPhoneLookup = normalizePhoneLookupKey(rawCustomerPhone);
+    if (customerPhoneDigits.length < 10 || !customerPhoneLookup) {
+      return res.status(400).json({ error: 'Please enter a valid phone number' });
+    }
+
+    const customerPhone = sanitizeInlineText(rawCustomerPhone, MAX_CUSTOMER_PHONE_LENGTH);
+    const orderType = normalizeOrderType(req.body.orderType);
+    const notes = sanitizeInlineText(req.body.notes || '', MAX_ORDER_NOTES_LENGTH);
+    const placedBy = requestedPlacedBy === 'admin' && hasAdminToken ? 'admin' : 'customer';
+
+    const pricedOrder = await validateAndPriceOrderItems(req.body.items);
+    if (pricedOrder.error) {
+      return res.status(400).json({ error: pricedOrder.error });
+    }
+
+    const { items, total } = pricedOrder;
     const now = new Date();
     const newOrder = new Order({
       id: await generateOrderId(now),
       customerName,
       customerPhone,
+      customerPhoneLookup,
       orderType,
       notes,
       status: 'pending',
