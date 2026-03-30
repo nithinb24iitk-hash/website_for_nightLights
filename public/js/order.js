@@ -7,6 +7,7 @@ let dynamicMenu = [];
 let cart = [];
 const TRACKING_STORAGE_KEY = 'frydayTrackingState';
 const TRACKING_SESSION_KEY = 'frydayActiveTrackingOrderId';
+const AI_HELPER_SESSION_HIDE_KEY = 'frydayHideAiHelper';
 
 function readTrackingState() {
   try {
@@ -168,6 +169,140 @@ async function handleActiveOrderRouting() {
   return false;
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function hideAIOrderHelper(permanent = false) {
+  const panel = document.getElementById('aiOrderHelper');
+  if (panel) {
+    panel.hidden = true;
+  }
+
+  if (permanent) {
+    sessionStorage.setItem(AI_HELPER_SESSION_HIDE_KEY, '1');
+  }
+}
+
+function applyAiItemsToCart(items) {
+  if (!Array.isArray(items) || !items.length) return 0;
+
+  let addedCount = 0;
+  items.forEach(entry => {
+    const itemId = Number(entry?.id);
+    const qty = Math.max(1, Number(entry?.qty) || 1);
+    const menuItem = dynamicMenu.find(item => item.id === itemId && !item.isSoldOut);
+    if (!menuItem) return;
+
+    const existing = cart.find(item => item.id === itemId);
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      cart.push({ ...menuItem, qty });
+    }
+    addedCount += qty;
+  });
+
+  if (addedCount > 0) {
+    renderCart();
+  }
+
+  return addedCount;
+}
+
+function setupAIOrderHelper() {
+  const panel = document.getElementById('aiOrderHelper');
+  const form = document.getElementById('aiOrderForm');
+  const promptInput = document.getElementById('aiOrderPrompt');
+  const submitBtn = document.getElementById('aiOrderSubmitBtn');
+  const closeBtn = document.getElementById('aiOrderCloseBtn');
+
+  if (!panel || !form || !promptInput || !submitBtn || panel.dataset.bound === '1') {
+    return;
+  }
+
+  panel.dataset.bound = '1';
+
+  closeBtn?.addEventListener('click', () => hideAIOrderHelper(true));
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const text = promptInput.value.trim();
+    if (text.length < 4) return;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding';
+
+    try {
+      const response = await fetchWithTimeout('/api/ai/order-helper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      }, 6000);
+
+      if (!response.ok) {
+        hideAIOrderHelper(true);
+        return;
+      }
+
+      const data = await response.json();
+      const added = applyAiItemsToCart(data.items);
+      promptInput.value = '';
+
+      if (added > 0) {
+        showToast(`${added} item${added === 1 ? '' : 's'} added`, 'success');
+      }
+    } catch (_) {
+      hideAIOrderHelper(true);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Add with AI';
+    }
+  });
+}
+
+async function initAIOrderHelper() {
+  if (sessionStorage.getItem(AI_HELPER_SESSION_HIDE_KEY) === '1') {
+    hideAIOrderHelper();
+    return;
+  }
+
+  const panel = document.getElementById('aiOrderHelper');
+  if (!panel) return;
+
+  try {
+    const response = await fetchWithTimeout('/api/ai/order-helper/status', {
+      cache: 'no-store'
+    }, 3500);
+
+    if (!response.ok) {
+      hideAIOrderHelper(true);
+      return;
+    }
+
+    const data = await response.json();
+    if (!data?.enabled) {
+      hideAIOrderHelper();
+      return;
+    }
+
+    panel.hidden = false;
+    setupAIOrderHelper();
+  } catch (_) {
+    hideAIOrderHelper(true);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Hamburger
   const hamburger = document.getElementById('hamburger');
@@ -192,6 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupFilters();
   setupCheckout();
   renderCart();
+  await initAIOrderHelper();
 });
 
 // Render menu items

@@ -49,6 +49,30 @@
         </div>
       </section>
 
+      <section class="ai-order-helper glass-premium" id="aiOrderHelper" hidden>
+        <div class="ai-order-head">
+          <div>
+            <span class="section-label"><i class="fas fa-circle"></i> AI Quick Add</span>
+            <h3>Describe your order in one line</h3>
+            <p>Try: "2 spicy burgers and 1 fries under ₹500"</p>
+          </div>
+          <button type="button" class="btn-ghost ai-order-close" id="aiOrderCloseBtn" aria-label="Hide AI helper">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+        <form class="ai-order-form" id="aiOrderForm">
+          <div class="form-group">
+            <label for="aiOrderPrompt">What do you want to order?</label>
+            <textarea id="aiOrderPrompt" maxlength="300" placeholder="Type your order in plain language"></textarea>
+          </div>
+          <div class="ai-order-actions">
+            <button type="submit" class="btn btn-primary" id="aiOrderSubmitBtn">
+              <i class="fas fa-wand-magic-sparkles"></i> Add with AI
+            </button>
+          </div>
+        </form>
+      </section>
+
       <!-- Filters -->
       <div class="menu-filters" id="menuFilters">
         <button class="filter-btn active" data-category="all">All</button>
